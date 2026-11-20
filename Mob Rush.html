@@ -1,0 +1,3020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Mob Rush — 3D Crowd Runner</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #9fa8f8;
+      font-family: 'Nunito', sans-serif;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .game-font {
+      font-family: 'Fredoka', sans-serif;
+    }
+    .text-outline {
+      text-shadow:
+        0 2px 0 rgba(30, 27, 75, 0.55),
+        0 4px 10px rgba(30, 27, 75, 0.25);
+    }
+    @keyframes pulseGlow {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.04); }
+    }
+    .pulse-cta {
+      animation: pulseGlow 1.6s ease-in-out infinite;
+    }
+    @keyframes crazyPulse {
+      0%, 100% { transform: scale(1) rotate(-1deg); }
+      50% { transform: scale(1.06) rotate(1deg); }
+    }
+    .crazy-badge {
+      animation: crazyPulse 0.9s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="relative w-full h-full overflow-hidden">
+
+  <!-- Full-viewport 2.5D/3D Game Canvas -->
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- Top HUD: Stage Progress Bar & Coin Pill -->
+  <div id="topHud" class="pointer-events-none fixed top-0 left-0 right-0 z-20 flex items-center justify-between px-4 pt-3 sm:px-8 sm:pt-5">
+    <div class="w-16 sm:w-28 flex items-center">
+      <button id="menuBtnHud" class="pointer-events-auto hidden px-3 py-1.5 rounded-full bg-slate-900/35 hover:bg-slate-900/55 active:scale-95 text-white text-xs font-extrabold tracking-wide backdrop-blur-sm border border-white/25 transition">
+        MENU
+      </button>
+    </div>
+
+    <!-- Center Level Progress Gauge -->
+    <div class="flex flex-col items-center">
+      <div class="flex items-center">
+        <div id="levelBadge" class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-sky-400 border-[3px] border-white shadow-md flex items-center justify-center text-white font-black text-base sm:text-lg z-10 game-font">
+          1
+        </div>
+        <div class="w-36 sm:w-56 h-4 sm:h-5 -mx-2 bg-slate-800/35 backdrop-blur-sm border-[2.5px] border-white rounded-full overflow-hidden shadow-inner flex items-center">
+          <div id="progressFill" class="h-full bg-gradient-to-r from-sky-300 to-sky-400 rounded-full transition-all duration-75" style="width: 0%;"></div>
+        </div>
+        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white border-[3px] border-white shadow-md flex items-center justify-center z-10 overflow-hidden">
+          <svg viewBox="0 0 24 24" class="w-6 h-6">
+            <rect x="0" y="0" width="6" height="6" fill="#334155"/>
+            <rect x="12" y="0" width="6" height="6" fill="#334155"/>
+            <rect x="6" y="6" width="6" height="6" fill="#334155"/>
+            <rect x="18" y="6" width="6" height="6" fill="#334155"/>
+            <rect x="0" y="12" width="6" height="6" fill="#334155"/>
+            <rect x="12" y="12" width="6" height="6" fill="#334155"/>
+            <rect x="6" y="18" width="6" height="6" fill="#334155"/>
+            <rect x="18" y="18" width="6" height="6" fill="#334155"/>
+          </svg>
+        </div>
+      </div>
+      <div id="biomeSubtitle" class="mt-1 px-2.5 py-0.5 rounded-full bg-slate-900/25 text-white/95 text-[10px] sm:text-xs font-extrabold tracking-widest uppercase backdrop-blur-xs">
+        ALPINE PEAKS
+      </div>
+    </div>
+
+    <!-- Top-Right Coin Counter Pill -->
+    <div class="flex items-center gap-2 bg-slate-900/35 backdrop-blur-sm border-2 border-white/40 rounded-full pl-3.5 pr-1.5 py-1 shadow-md">
+      <span id="coinDisplay" class="text-white font-black text-sm sm:text-base tracking-wide">0</span>
+      <div class="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gradient-to-b from-yellow-300 to-amber-500 border-2 border-yellow-100 flex items-center justify-center shadow-sm">
+        <span class="text-amber-900 font-black text-xs sm:text-sm leading-none">$</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active Boss HP HUD -->
+  <div id="bossHud" class="hidden pointer-events-none fixed top-20 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center w-64 sm:w-80">
+    <div class="flex items-center justify-between w-full px-1 mb-1">
+      <span class="text-rose-200 font-black text-xs sm:text-sm uppercase tracking-wider text-outline">COLOSSUS BOSS</span>
+      <span id="bossHpText" class="text-white font-black text-xs sm:text-sm text-outline">1000 / 1000</span>
+    </div>
+    <div class="w-full h-4 sm:h-5 bg-slate-950/65 border-2 border-amber-300 rounded-full overflow-hidden shadow-lg p-0.5">
+      <div id="bossHpFill" class="h-full bg-gradient-to-r from-red-500 via-rose-500 to-amber-400 rounded-full transition-all duration-75" style="width: 100%;"></div>
+    </div>
+  </div>
+
+  <!-- Main Menu Overlay -->
+  <div id="mainMenuOverlay" class="fixed inset-0 z-25 flex flex-col items-center justify-between py-16 sm:py-20 px-4 pointer-events-none">
+    <div class="flex flex-col items-center mt-2 sm:mt-4 text-center">
+      <div id="crazyMenuBanner" class="hidden crazy-badge mb-2 px-4 py-1 rounded-full bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 border-2 border-white text-amber-950 font-black text-xs sm:text-sm tracking-widest uppercase shadow-lg">
+        CRAZY BONUS ROUND • +300 &amp; x50 GATES!
+      </div>
+      <div id="menuStageTag" class="px-3.5 py-1 rounded-full bg-white/25 backdrop-blur-md border border-white/40 text-white font-extrabold text-xs sm:text-sm tracking-widest uppercase mb-1.5 shadow-sm">
+        STAGE 1 • ALPINE PEAKS
+      </div>
+      <h1 class="game-font text-5xl sm:text-7xl font-bold text-white tracking-tight text-outline leading-none">
+        MOB RUSH
+      </h1>
+      <p class="mt-2 text-white/95 font-extrabold text-xs sm:text-sm tracking-wide text-outline">
+        Lead the King • Reach 5.0x for Boss Arena!
+      </p>
+    </div>
+
+    <div class="pointer-events-auto flex flex-col items-center gap-3.5 w-full max-w-md mb-1">
+      <button id="startRunBtn" class="pulse-cta w-64 sm:w-72 py-3.5 sm:py-4 rounded-2xl bg-gradient-to-b from-emerald-400 to-emerald-600 hover:from-emerald-300 hover:to-emerald-500 active:translate-y-0.5 text-white font-black text-xl sm:text-2xl tracking-wider uppercase shadow-[0_6px_0_#065f46,0_12px_24px_rgba(0,0,0,0.3)] border-2 border-emerald-200 transition cursor-pointer">
+        TAP TO PLAY
+      </button>
+
+      <!-- Upgrade Shop Cards -->
+      <div class="grid grid-cols-2 gap-3 w-full">
+        <button id="btnUpgradeTroops" class="group relative flex flex-col items-center justify-between p-3 sm:p-3.5 rounded-2xl bg-slate-900/65 hover:bg-slate-900/80 active:scale-95 backdrop-blur-md border-2 border-sky-300/75 shadow-xl transition cursor-pointer">
+          <div class="flex items-center gap-1.5">
+            <span class="w-5 h-5 rounded-full bg-sky-400 text-slate-950 font-black text-xs flex items-center justify-center">+2</span>
+            <span class="text-white font-black text-xs sm:text-sm uppercase tracking-wide">Start Troops</span>
+          </div>
+          <div class="my-1 text-sky-300 font-black text-base sm:text-lg game-font">
+            <span id="troopCountLabel">1</span> <span class="text-xs font-extrabold text-sky-200/80">UNITS</span>
+          </div>
+          <div id="troopCostPill" class="w-full py-1 px-2.5 rounded-xl bg-amber-400 group-disabled:bg-slate-600 text-amber-950 group-disabled:text-slate-300 font-black text-xs sm:text-sm flex items-center justify-center gap-1 shadow-sm">
+            <span id="troopCostLabel">50</span>
+            <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-600 text-yellow-200 text-[10px]">$</span>
+          </div>
+        </button>
+
+        <button id="btnUpgradeIncome" class="group relative flex flex-col items-center justify-between p-3 sm:p-3.5 rounded-2xl bg-slate-900/65 hover:bg-slate-900/80 active:scale-95 backdrop-blur-md border-2 border-emerald-300/75 shadow-xl transition cursor-pointer">
+          <div class="flex items-center gap-1.5">
+            <span class="w-5 h-5 rounded-full bg-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center">%</span>
+            <span class="text-white font-black text-xs sm:text-sm uppercase tracking-wide">Income</span>
+          </div>
+          <div class="my-1 text-emerald-300 font-black text-base sm:text-lg game-font">
+            <span id="incomeMultLabel">100%</span> <span class="text-xs font-extrabold text-emerald-200/80">BONUS</span>
+          </div>
+          <div id="incomeCostPill" class="w-full py-1 px-2.5 rounded-xl bg-amber-400 group-disabled:bg-slate-600 text-amber-950 group-disabled:text-slate-300 font-black text-xs sm:text-sm flex items-center justify-center gap-1 shadow-sm">
+            <span id="incomeCostLabel">50</span>
+            <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-600 text-yellow-200 text-[10px]">$</span>
+          </div>
+        </button>
+      </div>
+
+      <!-- Compact Control Hint -->
+      <div class="px-4 py-1.5 rounded-xl bg-slate-900/45 backdrop-blur-md border border-white/15 flex items-center gap-4 text-white/90 text-[11px] font-extrabold tracking-wider">
+        <span><kbd class="px-1.5 py-0.5 bg-white text-slate-800 rounded text-[10px]">A</kbd> <kbd class="px-1.5 py-0.5 bg-white text-slate-800 rounded text-[10px]">D</kbd> STEER</span>
+        <span class="opacity-40">|</span>
+        <span>DRAG MOUSE / TOUCH</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Victory / Defeat Overlay Modal -->
+  <div id="endModal" class="hidden fixed inset-0 z-30 bg-slate-950/55 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white/95 rounded-3xl max-w-sm w-full p-6 sm:p-7 text-center shadow-2xl border-4 border-sky-300 transform transition-all">
+      <div id="modalBadge" class="inline-block px-3.5 py-1 rounded-full bg-sky-100 text-sky-700 font-black text-xs uppercase tracking-widest mb-2">
+        STAGE COMPLETE
+      </div>
+      <h2 id="modalTitle" class="game-font text-3xl sm:text-4xl font-bold text-slate-800 mb-1">
+        VICTORY!
+      </h2>
+      <p id="modalSubtitle" class="text-slate-500 font-bold text-sm mb-5">
+        Your crowd climbed the multiplier staircase!
+      </p>
+
+      <div id="rewardCard" class="bg-slate-100 rounded-2xl p-4 mb-6 border border-slate-200 flex flex-col gap-2">
+        <div class="flex justify-between items-center text-sm font-extrabold text-slate-600">
+          <span>People Collected</span>
+          <span id="statPeople" class="text-sky-600 text-base">0</span>
+        </div>
+        <div class="flex justify-between items-center text-sm font-extrabold text-slate-600">
+          <span>Pyramid Multiplier</span>
+          <span id="statMultiplier" class="text-amber-500 text-base">1.0x</span>
+        </div>
+        <div class="flex justify-between items-center text-sm font-extrabold text-slate-600">
+          <span>Income Upgrade</span>
+          <span id="statIncomeBoost" class="text-emerald-600 text-base">100%</span>
+        </div>
+        <div id="bossBonusRow" class="hidden flex justify-between items-center text-sm font-extrabold text-rose-600">
+          <span>Colossus Boss Jackpot</span>
+          <span id="statBossBonus" class="text-rose-600 text-base">2.0x</span>
+        </div>
+        <div class="h-px bg-slate-200 my-1"></div>
+        <div class="flex justify-between items-center text-base font-black text-slate-800">
+          <span>Coins Earned</span>
+          <span id="statCoinsEarned" class="text-emerald-600 text-xl">+0</span>
+        </div>
+      </div>
+
+      <button id="modalActionBtn" class="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-b from-sky-400 to-sky-600 hover:from-sky-500 hover:to-sky-700 active:translate-y-0.5 text-white font-black text-lg tracking-wide shadow-lg shadow-sky-500/30 transition cursor-pointer">
+        NEXT LEVEL
+      </button>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      // ------------------------------------------------------------------------
+      // 1. CANVAS & RESPONSIVE VIEWPORT SETUP
+      // ------------------------------------------------------------------------
+      const canvas = document.getElementById('gameCanvas');
+      const ctx = canvas.getContext('2d', { alpha: false });
+
+      let width = 0;
+      let height = 0;
+      let dpr = 1;
+
+      function resize() {
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      window.addEventListener('resize', resize);
+      resize();
+
+      // ------------------------------------------------------------------------
+      // 2. PERSISTENT ECONOMY & UPGRADE SYSTEM
+      // ------------------------------------------------------------------------
+      const STORAGE_KEY = 'mob_rush_save_v6';
+      let savedProgress = { coins: 0, level: 1, troopUpgradeLevel: 0, incomeUpgradeLevel: 0 };
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) savedProgress = Object.assign(savedProgress, JSON.parse(raw));
+      } catch (e) {}
+
+      function persistProgress() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(savedProgress));
+        } catch (e) {}
+      }
+
+      function getStartingTroopsCount() {
+        return 1 + savedProgress.troopUpgradeLevel * 2;
+      }
+
+      function getTroopUpgradeCost() {
+        return Math.round(50 * Math.pow(1.48, savedProgress.troopUpgradeLevel));
+      }
+
+      function getIncomeMultiplier() {
+        return 1 + savedProgress.incomeUpgradeLevel * 0.10;
+      }
+
+      function getIncomeUpgradeCost() {
+        return Math.round(50 * Math.pow(1.48, savedProgress.incomeUpgradeLevel));
+      }
+
+      // ------------------------------------------------------------------------
+      // 3. DISTINCT LEVEL BIOMES (LEVELS 1-9 + LEVEL 10+ HIGH-TIER BIOMES)
+      // ------------------------------------------------------------------------
+      const BIOME_THEMES = [
+        {
+          name: 'Alpine Peaks',
+          skyTop: '#8f99fb',
+          skyMid: '#adb6ff',
+          skyHorizon: '#ced4ff',
+          fogColor: [190, 198, 255],
+          roadDark: '#4f4674',
+          roadStripe: '#574e7e',
+          railTop: '#ffffff',
+          railSide: '#e2e8f0',
+          cliffLeft: '#9ba6f9',
+          cliffRight: '#7d88e8',
+          cliffCap: '#eef1ff',
+          cliffSnow: '#d6dcff'
+        },
+        {
+          name: 'Sunset Canyon',
+          skyTop: '#fb7185',
+          skyMid: '#fda4af',
+          skyHorizon: '#fed7aa',
+          fogColor: [253, 200, 185],
+          roadDark: '#582f47',
+          roadStripe: '#683955',
+          railTop: '#fff7ed',
+          railSide: '#fed7aa',
+          cliffLeft: '#fb923c',
+          cliffRight: '#c2410c',
+          cliffCap: '#ffedd5',
+          cliffSnow: '#fed7aa'
+        },
+        {
+          name: 'Emerald Jungle',
+          skyTop: '#10b981',
+          skyMid: '#6ee7b7',
+          skyHorizon: '#d1fae5',
+          fogColor: [185, 245, 220],
+          roadDark: '#1e463b',
+          roadStripe: '#265649',
+          railTop: '#ffffff',
+          railSide: '#a7f3d0',
+          cliffLeft: '#34d399',
+          cliffRight: '#059669',
+          cliffCap: '#ecfdf5',
+          cliffSnow: '#a7f3d0'
+        },
+        {
+          name: 'Magma Caldera',
+          skyTop: '#450a0a',
+          skyMid: '#991b1b',
+          skyHorizon: '#f97316',
+          fogColor: [215, 110, 68],
+          roadDark: '#291d24',
+          roadStripe: '#382730',
+          railTop: '#fde047',
+          railSide: '#f97316',
+          cliffLeft: '#7f1d1d',
+          cliffRight: '#450a0a',
+          cliffCap: '#fb923c',
+          cliffSnow: '#ea580c'
+        },
+        {
+          name: 'Neon Cybergrid',
+          skyTop: '#1e1b4b',
+          skyMid: '#312e81',
+          skyHorizon: '#c084fc',
+          fogColor: [148, 115, 238],
+          roadDark: '#17153b',
+          roadStripe: '#211e52',
+          railTop: '#38bdf8',
+          railSide: '#0284c7',
+          cliffLeft: '#6366f1',
+          cliffRight: '#3730a3',
+          cliffCap: '#e0e7ff',
+          cliffSnow: '#a5b4fc'
+        },
+        {
+          name: 'Golden Citadel',
+          skyTop: '#0284c7',
+          skyMid: '#38bdf8',
+          skyHorizon: '#fef08a',
+          fogColor: [220, 238, 225],
+          roadDark: '#3f3cbb',
+          roadStripe: '#4c49cf',
+          railTop: '#fef08a',
+          railSide: '#eab308',
+          cliffLeft: '#fbbf24',
+          cliffRight: '#d97706',
+          cliffCap: '#fffbeb',
+          cliffSnow: '#fef08a'
+        },
+        // Level 10+ Exclusive High-Tier Biomes
+        {
+          name: 'Crystal Glacier',
+          skyTop: '#0284c7',
+          skyMid: '#7dd3fc',
+          skyHorizon: '#f0f9ff',
+          fogColor: [215, 242, 255],
+          roadDark: '#1e3a5f',
+          roadStripe: '#2b5082',
+          railTop: '#ffffff',
+          railSide: '#bae6fd',
+          cliffLeft: '#38bdf8',
+          cliffRight: '#0369a1',
+          cliffCap: '#ffffff',
+          cliffSnow: '#e0f2fe'
+        },
+        {
+          name: 'Void Nebula',
+          skyTop: '#090d16',
+          skyMid: '#311042',
+          skyHorizon: '#9d4edd',
+          fogColor: [110, 56, 168],
+          roadDark: '#141124',
+          roadStripe: '#221c3d',
+          railTop: '#f0abfc',
+          railSide: '#c026d3',
+          cliffLeft: '#5a189a',
+          cliffRight: '#240046',
+          cliffCap: '#e0aaff',
+          cliffSnow: '#c77dff'
+        },
+        {
+          name: 'Sakura Highlands',
+          skyTop: '#be185d',
+          skyMid: '#f472b6',
+          skyHorizon: '#fce7f3',
+          fogColor: [250, 212, 232],
+          roadDark: '#4a2545',
+          roadStripe: '#61325b',
+          railTop: '#ffffff',
+          railSide: '#fbcfe8',
+          cliffLeft: '#ec4899',
+          cliffRight: '#9d174d',
+          cliffCap: '#fdf2f8',
+          cliffSnow: '#f9a8d4'
+        },
+        {
+          name: 'Thunder Forge',
+          skyTop: '#1f2937',
+          skyMid: '#4b5563',
+          skyHorizon: '#fde047',
+          fogColor: [168, 162, 130],
+          roadDark: '#111827',
+          roadStripe: '#1f2937',
+          railTop: '#fef08a',
+          railSide: '#eab308',
+          cliffLeft: '#4b5563',
+          cliffRight: '#1f2937',
+          cliffCap: '#fef9c3',
+          cliffSnow: '#fde047'
+        },
+        {
+          name: 'Sunken Atlantis',
+          skyTop: '#0f766e',
+          skyMid: '#2dd4bf',
+          skyHorizon: '#ccfbf1',
+          fogColor: [165, 240, 230],
+          roadDark: '#134e4a',
+          roadStripe: '#115e59',
+          railTop: '#ffffff',
+          railSide: '#99f6e4',
+          cliffLeft: '#14b8a6',
+          cliffRight: '#0f766e',
+          cliffCap: '#f0fdfa',
+          cliffSnow: '#5eead4'
+        },
+        {
+          name: 'Solar Eclipse',
+          skyTop: '#18181b',
+          skyMid: '#7c2d12',
+          skyHorizon: '#fb923c',
+          fogColor: [215, 128, 72],
+          roadDark: '#27272a',
+          roadStripe: '#3f3f46',
+          railTop: '#fed7aa',
+          railSide: '#f97316',
+          cliffLeft: '#9a3412',
+          cliffRight: '#431407',
+          cliffCap: '#ffedd5',
+          cliffSnow: '#fdba74'
+        }
+      ];
+
+      let currentTheme = BIOME_THEMES[0];
+
+      // ------------------------------------------------------------------------
+      // 4. 3D PERSPECTIVE CAMERA & ATMOSPHERIC FOG MATH
+      // ------------------------------------------------------------------------
+      const ROAD_HALF_WIDTH = 5.4;
+      const RAIL_WIDTH = 0.52;
+      const DRAW_DISTANCE = 155;
+      const FOG_START = 68;
+      const FOG_END = 152;
+      const GOLDEN_ANGLE = 2.399963229728653;
+
+      const camera = {
+        x: 0,
+        y: 9.8,
+        z: -11.5,
+        pitch: 0.43,
+        fov: 640,
+        shakeTimer: 0,
+        shakeIntensity: 0
+      };
+
+      const sinPitch = Math.sin(camera.pitch);
+      const cosPitch = Math.cos(camera.pitch);
+
+      const pA = { sx: 0, sy: 0, scale: 0, cz: 0, visible: false };
+      const pB = { sx: 0, sy: 0, scale: 0, cz: 0, visible: false };
+      const pC = { sx: 0, sy: 0, scale: 0, cz: 0, visible: false };
+      const pD = { sx: 0, sy: 0, scale: 0, cz: 0, visible: false };
+
+      function project3D(wx, wy, wz, out) {
+        const dx = wx - camera.x;
+        const dy = wy - camera.y;
+        const dz = wz - camera.z;
+
+        const cz = dz * cosPitch - dy * sinPitch;
+        if (cz <= 0.4) {
+          out.visible = false;
+          return out;
+        }
+        const cy = dy * cosPitch + dz * sinPitch;
+        const focal = camera.fov * (Math.min(width, height * 1.15) / 860);
+        const scale = focal / cz;
+
+        out.sx = width * 0.5 + dx * scale;
+        out.sy = height * 0.45 - cy * scale;
+        out.scale = scale;
+        out.cz = cz;
+        out.visible = true;
+        return out;
+      }
+
+      function fogFactor(dz) {
+        if (dz <= FOG_START) return 0;
+        if (dz >= FOG_END) return 1;
+        const t = (dz - FOG_START) / (FOG_END - FOG_START);
+        return t * t;
+      }
+
+      const rgbCache = new Map();
+      function hexToRgb(hex) {
+        let c = rgbCache.get(hex);
+        if (!c) {
+          const clean = hex.replace('#', '');
+          c = [
+            parseInt(clean.substring(0, 2), 16),
+            parseInt(clean.substring(2, 4), 16),
+            parseInt(clean.substring(4, 6), 16)
+          ];
+          rgbCache.set(hex, c);
+        }
+        return c;
+      }
+
+      function blendFog(hex, fog) {
+        if (fog <= 0.01) return hex;
+        const [r, g, b] = hexToRgb(hex);
+        const [fr, fg, fb] = currentTheme.fogColor;
+        const nr = Math.round(r + (fr - r) * fog);
+        const ng = Math.round(g + (fg - g) * fog);
+        const nb = Math.round(b + (fb - b) * fog);
+        return `rgb(${nr},${ng},${nb})`;
+      }
+
+      // ------------------------------------------------------------------------
+      // 5. OBJECT POOLS (INFINITE LOGICAL CROWD + ZERO-LAG SPRITE CACHE)
+      // ------------------------------------------------------------------------
+      const MAX_VISUAL_CROWD = 220;
+      const crowdPool = new Array(MAX_VISUAL_CROWD);
+      for (let i = 0; i < MAX_VISUAL_CROWD; i++) {
+        crowdPool[i] = {
+          active: false,
+          isLeader: false,
+          x: 0,
+          y: 0,
+          z: 0,
+          vx: 0,
+          vy: 0,
+          vz: 0,
+          phase: (i * 1.37) % (Math.PI * 2),
+          scalePop: 1,
+          pyramidLayer: -1,
+          pyramidSlotX: 0,
+          pyramidSlotY: 0,
+          pyramidSlotZ: 0,
+          fallen: false,
+          jumpProgress: -1,
+          fallingIntoAbyss: false
+        };
+      }
+
+      // Pre-rendered High-DPI Character & King Sprites
+      const SPRITE_W = 128;
+      const SPRITE_H = 160;
+      const followerSpriteCanvas = document.createElement('canvas');
+      followerSpriteCanvas.width = SPRITE_W;
+      followerSpriteCanvas.height = SPRITE_H;
+      const kingSpriteCanvas = document.createElement('canvas');
+      kingSpriteCanvas.width = SPRITE_W;
+      kingSpriteCanvas.height = SPRITE_H;
+
+      function bakeCharacterSprites() {
+        const fCtx = followerSpriteCanvas.getContext('2d');
+        const cx = SPRITE_W * 0.5;
+        const base = SPRITE_H - 18;
+
+        fCtx.fillStyle = 'rgba(15, 23, 42, 0.32)';
+        fCtx.beginPath();
+        fCtx.ellipse(cx, base + 2, 26, 10, 0, 0, Math.PI * 2);
+        fCtx.fill();
+
+        fCtx.fillStyle = '#0c4a6e';
+        fCtx.beginPath();
+        fCtx.roundRect(cx - 16, base - 22, 12, 22, 6);
+        fCtx.roundRect(cx + 4, base - 22, 12, 22, 6);
+        fCtx.fill();
+
+        fCtx.fillStyle = '#38bdf8';
+        fCtx.beginPath();
+        fCtx.ellipse(cx - 26, base - 54, 8, 17, -0.28, 0, Math.PI * 2);
+        fCtx.ellipse(cx + 26, base - 54, 8, 17, 0.28, 0, Math.PI * 2);
+        fCtx.fill();
+        fCtx.fillStyle = '#bae6fd';
+        fCtx.beginPath();
+        fCtx.arc(cx - 29, base - 41, 6, 0, Math.PI * 2);
+        fCtx.arc(cx + 29, base - 41, 6, 0, Math.PI * 2);
+        fCtx.fill();
+
+        const bodyGrad = fCtx.createLinearGradient(cx - 22, base - 108, cx + 22, base - 18);
+        bodyGrad.addColorStop(0, '#bae6fd');
+        bodyGrad.addColorStop(0.28, '#38bdf8');
+        bodyGrad.addColorStop(0.75, '#0284c7');
+        bodyGrad.addColorStop(1, '#0369a1');
+        fCtx.fillStyle = bodyGrad;
+        fCtx.beginPath();
+        fCtx.arc(cx, base - 84, 22, Math.PI, 0);
+        fCtx.lineTo(cx + 22, base - 28);
+        fCtx.arc(cx, base - 28, 22, 0, Math.PI);
+        fCtx.closePath();
+        fCtx.fill();
+
+        fCtx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+        fCtx.lineWidth = 2;
+        fCtx.stroke();
+
+        fCtx.fillStyle = '#0f172a';
+        fCtx.fillRect(cx - 21, base - 42, 42, 7);
+        fCtx.fillStyle = '#38bdf8';
+        fCtx.beginPath();
+        fCtx.roundRect(cx - 6, base - 44, 12, 11, 3);
+        fCtx.fill();
+
+        fCtx.fillStyle = '#0f172a';
+        fCtx.beginPath();
+        fCtx.ellipse(cx - 8, base - 82, 3.6, 5.2, 0, 0, Math.PI * 2);
+        fCtx.ellipse(cx + 8, base - 82, 3.6, 5.2, 0, 0, Math.PI * 2);
+        fCtx.fill();
+
+        fCtx.fillStyle = '#ffffff';
+        fCtx.beginPath();
+        fCtx.arc(cx - 9.2, base - 84, 1.6, 0, Math.PI * 2);
+        fCtx.arc(cx + 6.8, base - 84, 1.6, 0, Math.PI * 2);
+        fCtx.fill();
+
+        fCtx.fillStyle = '#0284c7';
+        fCtx.fillRect(cx - 21, base - 94, 42, 6);
+        fCtx.fillStyle = '#e0f2fe';
+        fCtx.beginPath();
+        fCtx.arc(cx, base - 91, 4, 0, Math.PI * 2);
+        fCtx.fill();
+
+        fCtx.fillStyle = 'rgba(255, 255, 255, 0.52)';
+        fCtx.beginPath();
+        fCtx.ellipse(cx - 9, base - 99, 7, 4, -0.45, 0, Math.PI * 2);
+        fCtx.fill();
+
+        // King Sprite
+        const kCtx = kingSpriteCanvas.getContext('2d');
+        kCtx.strokeStyle = 'rgba(250, 204, 21, 0.92)';
+        kCtx.lineWidth = 4;
+        kCtx.beginPath();
+        kCtx.ellipse(cx, base + 2, 34, 13, 0, 0, Math.PI * 2);
+        kCtx.stroke();
+
+        kCtx.fillStyle = 'rgba(15, 23, 42, 0.38)';
+        kCtx.beginPath();
+        kCtx.ellipse(cx, base + 2, 28, 11, 0, 0, Math.PI * 2);
+        kCtx.fill();
+
+        const capeGrad = kCtx.createLinearGradient(cx, base - 88, cx, base - 10);
+        capeGrad.addColorStop(0, '#dc2626');
+        capeGrad.addColorStop(0.85, '#991b1b');
+        capeGrad.addColorStop(1, '#facc15');
+        kCtx.fillStyle = capeGrad;
+        kCtx.beginPath();
+        kCtx.moveTo(cx - 22, base - 76);
+        kCtx.lineTo(cx - 34, base - 14);
+        kCtx.lineTo(cx + 34, base - 14);
+        kCtx.lineTo(cx + 22, base - 76);
+        kCtx.closePath();
+        kCtx.fill();
+
+        kCtx.fillStyle = '#1e1b4b';
+        kCtx.beginPath();
+        kCtx.roundRect(cx - 18, base - 24, 13, 24, 6);
+        kCtx.roundRect(cx + 5, base - 24, 13, 24, 6);
+        kCtx.fill();
+        kCtx.fillStyle = '#facc15';
+        kCtx.fillRect(cx - 18, base - 24, 13, 4);
+        kCtx.fillRect(cx + 5, base - 24, 13, 4);
+
+        kCtx.fillStyle = '#2563eb';
+        kCtx.beginPath();
+        kCtx.ellipse(cx - 28, base - 56, 9, 18, -0.3, 0, Math.PI * 2);
+        kCtx.ellipse(cx + 28, base - 56, 9, 18, 0.3, 0, Math.PI * 2);
+        kCtx.fill();
+
+        kCtx.fillStyle = '#facc15';
+        kCtx.beginPath();
+        kCtx.arc(cx - 24, base - 68, 9, 0, Math.PI * 2);
+        kCtx.arc(cx + 24, base - 68, 9, 0, Math.PI * 2);
+        kCtx.fill();
+
+        const kingGrad = kCtx.createLinearGradient(cx - 24, base - 112, cx + 24, base - 18);
+        kingGrad.addColorStop(0, '#93c5fd');
+        kingGrad.addColorStop(0.3, '#2563eb');
+        kingGrad.addColorStop(0.75, '#1d4ed8');
+        kingGrad.addColorStop(1, '#1e3a8a');
+        kCtx.fillStyle = kingGrad;
+        kCtx.beginPath();
+        kCtx.arc(cx, base - 86, 24, Math.PI, 0);
+        kCtx.lineTo(cx + 24, base - 28);
+        kCtx.arc(cx, base - 28, 24, 0, Math.PI);
+        kCtx.closePath();
+        kCtx.fill();
+
+        kCtx.strokeStyle = '#fde047';
+        kCtx.lineWidth = 2.5;
+        kCtx.stroke();
+
+        kCtx.fillStyle = '#facc15';
+        kCtx.fillRect(cx - 23, base - 44, 46, 8);
+        kCtx.fillStyle = '#ef4444';
+        kCtx.beginPath();
+        kCtx.arc(cx, base - 40, 5, 0, Math.PI * 2);
+        kCtx.fill();
+
+        kCtx.fillStyle = '#0f172a';
+        kCtx.beginPath();
+        kCtx.ellipse(cx - 9, base - 84, 4, 5.5, 0, 0, Math.PI * 2);
+        kCtx.ellipse(cx + 9, base - 84, 4, 5.5, 0, 0, Math.PI * 2);
+        kCtx.fill();
+        kCtx.fillStyle = '#ffffff';
+        kCtx.beginPath();
+        kCtx.arc(cx - 10.2, base - 86, 1.8, 0, Math.PI * 2);
+        kCtx.arc(cx + 7.8, base - 86, 1.8, 0, Math.PI * 2);
+        kCtx.fill();
+
+        kCtx.strokeStyle = '#1e1b4b';
+        kCtx.lineWidth = 3;
+        kCtx.beginPath();
+        kCtx.moveTo(cx - 15, base - 91);
+        kCtx.lineTo(cx - 4, base - 89);
+        kCtx.moveTo(cx + 15, base - 91);
+        kCtx.lineTo(cx + 4, base - 89);
+        kCtx.stroke();
+
+        const crownBaseY = base - 105;
+        kCtx.fillStyle = '#facc15';
+        kCtx.strokeStyle = '#92400e';
+        kCtx.lineWidth = 2.5;
+        kCtx.beginPath();
+        kCtx.moveTo(cx - 22, crownBaseY);
+        kCtx.lineTo(cx - 25, crownBaseY - 24);
+        kCtx.lineTo(cx - 10, crownBaseY - 12);
+        kCtx.lineTo(cx, crownBaseY - 29);
+        kCtx.lineTo(cx + 10, crownBaseY - 12);
+        kCtx.lineTo(cx + 25, crownBaseY - 24);
+        kCtx.lineTo(cx + 22, crownBaseY);
+        kCtx.closePath();
+        kCtx.fill();
+        kCtx.stroke();
+
+        kCtx.fillStyle = '#ef4444';
+        kCtx.beginPath();
+        kCtx.arc(cx, crownBaseY - 8, 4, 0, Math.PI * 2);
+        kCtx.fill();
+        kCtx.fillStyle = '#10b981';
+        kCtx.beginPath();
+        kCtx.arc(cx - 14, crownBaseY - 6, 3, 0, Math.PI * 2);
+        kCtx.arc(cx + 14, crownBaseY - 6, 3, 0, Math.PI * 2);
+        kCtx.fill();
+      }
+      bakeCharacterSprites();
+
+      let activeCount = 0;
+      let visualActiveCount = 0;
+
+      // $O(N)$ Spatial Hash Grid for instant crowd separation
+      const GRID_COLS = 24;
+      const GRID_ROWS = 24;
+      const GRID_CELL_SIZE = 0.72;
+      const gridHead = new Int16Array(GRID_COLS * GRID_ROWS);
+      const gridNext = new Int16Array(MAX_VISUAL_CROWD);
+
+      function applySpatialSeparation(dt, minDist, strength) {
+        if (visualActiveCount <= 2) return;
+        gridHead.fill(-1);
+        const minDistSq = minDist * minDist;
+
+        for (let i = 1; i < MAX_VISUAL_CROWD; i++) {
+          const u = crowdPool[i];
+          if (!u.active) continue;
+          const col = Math.max(0, Math.min(GRID_COLS - 1, Math.floor((u.x + 8.5) / GRID_CELL_SIZE)));
+          const row = Math.max(0, Math.min(GRID_ROWS - 1, Math.floor((u.z - (gameState.playerZ - 12)) / GRID_CELL_SIZE)));
+          const cell = row * GRID_COLS + col;
+          gridNext[i] = gridHead[cell];
+          gridHead[cell] = i;
+        }
+
+        for (let i = 1; i < MAX_VISUAL_CROWD; i++) {
+          const a = crowdPool[i];
+          if (!a.active) continue;
+          const col = Math.max(0, Math.min(GRID_COLS - 1, Math.floor((a.x + 8.5) / GRID_CELL_SIZE)));
+          const row = Math.max(0, Math.min(GRID_ROWS - 1, Math.floor((a.z - (gameState.playerZ - 12)) / GRID_CELL_SIZE)));
+
+          for (let dr = -1; dr <= 1; dr++) {
+            const nr = row + dr;
+            if (nr < 0 || nr >= GRID_ROWS) continue;
+            for (let dc = -1; dc <= 1; dc++) {
+              const nc = col + dc;
+              if (nc < 0 || nc >= GRID_COLS) continue;
+              let j = gridHead[nr * GRID_COLS + nc];
+              while (j !== -1) {
+                if (j > i) {
+                  const b = crowdPool[j];
+                  const dx = b.x - a.x;
+                  const dz = b.z - a.z;
+                  const dSq = dx * dx + dz * dz;
+                  if (dSq > 0.00001 && dSq < minDistSq) {
+                    const dist = Math.sqrt(dSq);
+                    const push = ((minDist - dist) / dist) * strength * dt;
+                    const px = dx * push;
+                    const pz = dz * push;
+                    a.vx -= px;
+                    a.vz -= pz;
+                    b.vx += px;
+                    b.vz += pz;
+                  }
+                }
+                j = gridNext[j];
+              }
+            }
+          }
+        }
+      }
+
+      const MAX_PARTICLES = 360;
+      const particlePool = new Array(MAX_PARTICLES);
+      for (let i = 0; i < MAX_PARTICLES; i++) {
+        particlePool[i] = {
+          active: false,
+          x: 0, y: 0, z: 0,
+          vx: 0, vy: 0, vz: 0,
+          size: 0.14,
+          color: '#38bdf8',
+          life: 0,
+          maxLife: 0.5
+        };
+      }
+
+      function spawnParticleBurst(wx, wy, wz, count, color, speedScale = 5.5) {
+        let spawned = 0;
+        for (let i = 0; i < MAX_PARTICLES && spawned < count; i++) {
+          const p = particlePool[i];
+          if (!p.active) {
+            p.active = true;
+            p.x = wx;
+            p.y = wy;
+            p.z = wz;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.random() * Math.PI * 0.65;
+            const spd = (0.35 + Math.random() * 0.75) * speedScale;
+            p.vx = Math.cos(theta) * Math.sin(phi) * spd;
+            p.vy = Math.cos(phi) * spd + 2.4;
+            p.vz = Math.sin(theta) * Math.sin(phi) * spd;
+            p.size = 0.09 + Math.random() * 0.11;
+            p.color = color;
+            p.life = 0;
+            p.maxLife = 0.35 + Math.random() * 0.25;
+            spawned++;
+          }
+        }
+      }
+
+      const MAX_POPUPS = 16;
+      const popupPool = new Array(MAX_POPUPS);
+      for (let i = 0; i < MAX_POPUPS; i++) {
+        popupPool[i] = {
+          active: false,
+          text: '',
+          x: 0, y: 0, z: 0,
+          color: '#ffffff',
+          life: 0,
+          maxLife: 0.95
+        };
+      }
+
+      function spawnPopup(text, wx, wy, wz, color = '#ffffff') {
+        for (let i = 0; i < MAX_POPUPS; i++) {
+          const pop = popupPool[i];
+          if (!pop.active) {
+            pop.active = true;
+            pop.text = text;
+            pop.x = wx;
+            pop.y = wy;
+            pop.z = wz;
+            pop.color = color;
+            pop.life = 0;
+            pop.maxLife = 0.95;
+            return;
+          }
+        }
+      }
+
+      function clearCrowd() {
+        for (let i = 0; i < MAX_VISUAL_CROWD; i++) {
+          crowdPool[i].active = false;
+          crowdPool[i].isLeader = false;
+          crowdPool[i].fallen = false;
+          crowdPool[i].fallingIntoAbyss = false;
+          crowdPool[i].jumpProgress = -1;
+          crowdPool[i].pyramidLayer = -1;
+        }
+        activeCount = 0;
+        visualActiveCount = 0;
+      }
+
+      function syncVisualProxies(originX, originZ) {
+        const targetVisual = Math.min(MAX_VISUAL_CROWD, Math.max(0, Math.round(activeCount)));
+        if (targetVisual > visualActiveCount) {
+          let toAdd = targetVisual - visualActiveCount;
+          for (let i = 0; i < MAX_VISUAL_CROWD && toAdd > 0; i++) {
+            const u = crowdPool[i];
+            if (!u.active) {
+              u.active = true;
+              u.isLeader = (i === 0);
+              u.fallen = false;
+              u.fallingIntoAbyss = false;
+              u.jumpProgress = -1;
+              u.pyramidLayer = -1;
+              if (u.isLeader) {
+                u.x = originX;
+                u.y = 0;
+                u.z = originZ + 0.45;
+                u.vx = 0;
+                u.vy = 0;
+                u.vz = 0;
+                u.scalePop = 1;
+              } else {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = Math.random() * 0.45;
+                u.x = originX + Math.cos(angle) * dist;
+                u.y = 0;
+                u.z = originZ - 0.65 - Math.abs(Math.sin(angle)) * dist;
+                u.vx = Math.cos(angle) * 2.2;
+                u.vy = 0;
+                u.vz = Math.sin(angle) * 2.2;
+                u.scalePop = 0.25;
+              }
+              toAdd--;
+              visualActiveCount++;
+            }
+          }
+        } else if (targetVisual < visualActiveCount) {
+          let toRemove = visualActiveCount - targetVisual;
+          for (let i = MAX_VISUAL_CROWD - 1; i >= 1 && toRemove > 0; i--) {
+            const u = crowdPool[i];
+            if (u.active) {
+              u.active = false;
+              toRemove--;
+              visualActiveCount--;
+            }
+          }
+        }
+      }
+
+      function setCrowdExact(count, originX, originZ) {
+        const nextCount = Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.round(count)));
+        const delta = nextCount - activeCount;
+        activeCount = nextCount;
+        syncVisualProxies(originX, originZ);
+        if (delta > 0) {
+          spawnParticleBurst(originX, 0.8, originZ, Math.min(26, Math.max(6, Math.min(delta, 24))), '#7dd3fc', 5.2);
+        } else if (delta < 0) {
+          spawnParticleBurst(originX, 0.7, originZ, Math.min(22, Math.max(5, Math.min(-delta, 20))), '#f87171', 5.8);
+        }
+      }
+
+      // ------------------------------------------------------------------------
+      // 6. WORLD ENTITIES & 5.0x SUMMIT BOSS ARENA STATE
+      // ------------------------------------------------------------------------
+      const STAIR_COLORS = [
+        '#f43f5e', '#fb7185', '#f97316', '#fb923c', '#f59e0b',
+        '#eab308', '#84cc16', '#22c55e', '#10b981', '#14b8a6',
+        '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6',
+        '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#facc15'
+      ];
+
+      const bossGates = [];
+      const bossFightState = {
+        active: false,
+        arenaY: 0,
+        bossX: 0,
+        bossZ: 0,
+        bossHp: 1000,
+        bossMaxHp: 1000,
+        powerLevel: 1,
+        attackTimer: 0,
+        bossSlamTimer: 0,
+        hitFlash: 0,
+        defeated: false
+      };
+
+      const gameState = {
+        phase: 'MENU', // 'MENU' | 'RUNNING' | 'STAIRCASE' | 'BOSS_GAUNTLET' | 'BOSS_FIGHT' | 'RESULT'
+        playerX: 0,
+        playerZ: 0,
+        targetX: 0,
+        runSpeed: 19.5,
+        collectedPeople: 0,
+        pyramidPeakMultiplier: 1.0,
+        pyramidLayers: [],
+        pyramidTotalLayers: 0,
+        activeBottomLayer: 0,
+        stairStepIndex: 0,
+        stairClimbTimer: 0
+      };
+
+      let finishZ = 240;
+      let bossArenaStartZ = 330;
+      let bossArenaEndZ = 420;
+      const gates = [];
+      const obstacles = [];
+      const gapZones = [];
+      const cliffs = [];
+      const stairs = [];
+
+      // ------------------------------------------------------------------------
+      // 7. LEVEL & BIOME GENERATOR (12 THEMES, LEVEL 10+ GAUNTLETS & RAMP GAPS)
+      // ------------------------------------------------------------------------
+      function buildLevel(levelNum) {
+        const isCrazyRound = (levelNum % 5 === 0);
+        const themeIdx = levelNum >= 10
+          ? 6 + ((levelNum - 10) % (BIOME_THEMES.length - 6))
+          : (levelNum - 1) % 6;
+        currentTheme = isCrazyRound
+          ? {
+              name: 'CRAZY GOLD FRENZY',
+              skyTop: '#4c1d95',
+              skyMid: '#9333ea',
+              skyHorizon: '#fde047',
+              fogColor: [232, 185, 118],
+              roadDark: '#3b0764',
+              roadStripe: '#581c87',
+              railTop: '#fef08a',
+              railSide: '#f59e0b',
+              cliffLeft: '#f59e0b',
+              cliffRight: '#b45309',
+              cliffCap: '#fef9c3',
+              cliffSnow: '#fde047'
+            }
+          : BIOME_THEMES[themeIdx];
+
+        document.body.style.background = currentTheme.skyTop;
+
+        gates.length = 0;
+        obstacles.length = 0;
+        gapZones.length = 0;
+        cliffs.length = 0;
+        stairs.length = 0;
+
+        gameState.runSpeed = isCrazyRound
+          ? 22.8
+          : Math.min(26.5, 19.2 + (levelNum - 1) * 0.32);
+
+        const waveCount = isCrazyRound
+          ? 10
+          : Math.min(16, 8 + Math.floor(levelNum * 0.55));
+        let zCursor = 30;
+
+        for (let w = 0; w < waveCount; w++) {
+          const isEarly = w < 2;
+          const isGapWave = !isCrazyRound && !isEarly && levelNum >= 2 && (
+            (levelNum >= 10 && (w % 4 === 3)) ||
+            (levelNum < 10 && w === 5)
+          );
+
+          if (isGapWave) {
+            const rampSide = ((w + levelNum) % 2 === 0) ? -1 : 1;
+            const rampWidth = levelNum >= 10 ? 3.2 : 3.8;
+            const rampMinX = rampSide === -1 ? -ROAD_HALF_WIDTH + 0.15 : ROAD_HALF_WIDTH - rampWidth - 0.15;
+            const rampMaxX = rampMinX + rampWidth;
+            const maxSurvivors = levelNum >= 10
+              ? Math.max(25, 45 + (levelNum % 5) * 15)
+              : Math.max(30, 55 + levelNum * 8);
+
+            gapZones.push({
+              zStart: zCursor,
+              zEnd: zCursor + 7.5,
+              rampSide,
+              rampMinX,
+              rampMaxX,
+              maxSurvivors,
+              survivedCount: 0,
+              kingCrossed: false,
+              capPopupShown: false,
+              enforcedLogicalCap: false
+            });
+            zCursor += 31;
+            continue;
+          }
+
+          const isGateWave = isCrazyRound ? (w % 3 !== 2) : (w % 2 === 0);
+
+          if (isGateWave) {
+            if (isCrazyRound) {
+              const leftOp = Math.random() < 0.5
+                ? { op: 'ADD', val: 300 + Math.floor(Math.random() * 3) * 100 }
+                : { op: 'MUL', val: 25 };
+              const rightOp = leftOp.op === 'MUL'
+                ? { op: 'ADD', val: 500 }
+                : { op: 'MUL', val: 50 };
+
+              gates.push({
+                z: zCursor,
+                minX: -ROAD_HALF_WIDTH,
+                maxX: -0.15,
+                op: leftOp.op,
+                val: leftOp.val,
+                label: leftOp.op === 'MUL' ? `x${leftOp.val}` : `+${leftOp.val}`,
+                isTrap: false,
+                triggered: false,
+                pairId: w
+              });
+              gates.push({
+                z: zCursor,
+                minX: 0.15,
+                maxX: ROAD_HALF_WIDTH,
+                op: rightOp.op,
+                val: rightOp.val,
+                label: rightOp.op === 'MUL' ? `x${rightOp.val}` : `+${rightOp.val}`,
+                isTrap: false,
+                triggered: false,
+                pairId: w
+              });
+            } else if (levelNum >= 3 && (w % 4 === 2 || (levelNum >= 10 && w % 3 === 0))) {
+              const laneW = (ROAD_HALF_WIDTH * 2) / 3;
+              const trapLane = (w + levelNum) % 3;
+              const secondTrapLane = levelNum >= 12 ? (trapLane + 2) % 3 : -1;
+              for (let l = 0; l < 3; l++) {
+                const isTrap = (l === trapLane && levelNum >= 4) || (l === secondTrapLane);
+                const x0 = -ROAD_HALF_WIDTH + l * laneW + (l > 0 ? 0.1 : 0);
+                const x1 = -ROAD_HALF_WIDTH + (l + 1) * laneW - (l < 2 ? 0.1 : 0);
+                let op = 'ADD';
+                let val = 15 + levelNum * 5;
+                if (isTrap) {
+                  op = Math.random() < 0.5 ? 'SUB' : 'DIV';
+                  val = op === 'DIV' ? (levelNum >= 10 ? 3 : 2) : 15 + levelNum * 4;
+                } else if (l === (trapLane + 1) % 3) {
+                  op = 'MUL';
+                  val = isEarly ? 2 : (levelNum >= 10 ? 4 : (Math.random() < 0.45 ? 3 : 2));
+                }
+                const label = op === 'MUL' ? `x${val}` : op === 'ADD' ? `+${val}` : op === 'SUB' ? `-${val}` : `÷${val}`;
+                gates.push({
+                  z: zCursor,
+                  minX: x0,
+                  maxX: x1,
+                  op,
+                  val,
+                  label,
+                  isTrap,
+                  triggered: false,
+                  pairId: w
+                });
+              }
+            } else {
+              const leftMul = Math.random() < 0.5;
+              const addAmt = (isEarly ? 12 : 20) + levelNum * 5 + Math.floor(Math.random() * 4) * 5;
+              const mulAmt = isEarly ? 2 : (levelNum >= 10 ? 4 : (Math.random() < 0.35 ? 4 : 3));
+              const useTrapOnOne = !isEarly && levelNum >= 4 && Math.random() < 0.35;
+
+              const leftOp = leftMul
+                ? { op: 'MUL', val: mulAmt, isTrap: false }
+                : useTrapOnOne
+                  ? { op: 'SUB', val: 15 + levelNum * 2, isTrap: true }
+                  : { op: 'ADD', val: addAmt, isTrap: false };
+
+              const rightOp = !leftMul
+                ? { op: 'MUL', val: mulAmt, isTrap: false }
+                : { op: 'ADD', val: addAmt, isTrap: false };
+
+              gates.push({
+                z: zCursor,
+                minX: -ROAD_HALF_WIDTH,
+                maxX: -0.15,
+                op: leftOp.op,
+                val: leftOp.val,
+                label: leftOp.op === 'MUL' ? `x${leftOp.val}` : leftOp.op === 'SUB' ? `-${leftOp.val}` : `+${leftOp.val}`,
+                isTrap: leftOp.isTrap,
+                triggered: false,
+                pairId: w
+              });
+              gates.push({
+                z: zCursor,
+                minX: 0.15,
+                maxX: ROAD_HALF_WIDTH,
+                op: rightOp.op,
+                val: rightOp.val,
+                label: rightOp.op === 'MUL' ? `x${rightOp.val}` : `+${rightOp.val}`,
+                isTrap: rightOp.isTrap,
+                triggered: false,
+                pairId: w
+              });
+            }
+          } else {
+            const hazardRoll = (levelNum + w) % 3;
+            const dmgScale = isCrazyRound ? 45 : Math.max(8, Math.floor(10 + levelNum * 3 + w * 2));
+
+            if (levelNum >= 10 && w % 3 === 1) {
+              for (let s = 0; s < 2; s++) {
+                const startX = s === 0 ? -2.7 : 2.7;
+                obstacles.push({
+                  kind: 'SAWBLADE',
+                  x: startX,
+                  baseX: startX,
+                  z: zCursor,
+                  radius: 1.4,
+                  spinAngle: 0,
+                  moveAmp: 1.75,
+                  moveSpeed: 2.8 + (levelNum - 10) * 0.15,
+                  movePhase: s * Math.PI,
+                  damagePool: dmgScale
+                });
+              }
+            } else if (levelNum >= 3 && hazardRoll === 0) {
+              const count = levelNum >= 5 ? 2 : 1;
+              for (let s = 0; s < count; s++) {
+                const startX = count === 1 ? 0 : (s === 0 ? -2.4 : 2.4);
+                obstacles.push({
+                  kind: 'SAWBLADE',
+                  x: startX,
+                  baseX: startX,
+                  z: zCursor,
+                  radius: 1.45,
+                  spinAngle: 0,
+                  moveAmp: count === 1 ? 3.2 : 1.4,
+                  moveSpeed: 2.2 + levelNum * 0.15,
+                  movePhase: s * Math.PI,
+                  damagePool: dmgScale
+                });
+              }
+            } else if (levelNum >= 2 && hazardRoll === 1) {
+              obstacles.push({
+                kind: 'MOVING_WALL',
+                x: 0,
+                baseX: 0,
+                z: zCursor,
+                w: levelNum >= 10 ? 4.8 : 4.2,
+                h: 1.45,
+                d: 0.9,
+                moveAmp: ROAD_HALF_WIDTH - (levelNum >= 10 ? 2.55 : 2.3),
+                moveSpeed: 2.1 + levelNum * 0.18,
+                movePhase: w * 1.1,
+                damagePool: dmgScale
+              });
+            } else {
+              const side = (w % 2 === 0) ? -1 : 1;
+              obstacles.push({
+                kind: 'BLOCK',
+                x: side * 2.5,
+                baseX: side * 2.5,
+                z: zCursor,
+                w: 4.4,
+                h: 1.5,
+                d: 1.0,
+                moveAmp: 0,
+                moveSpeed: 0,
+                movePhase: 0,
+                damagePool: dmgScale
+              });
+              if (levelNum >= 10) {
+                obstacles.push({
+                  kind: 'BLOCK',
+                  x: -side * 2.5,
+                  baseX: -side * 2.5,
+                  z: zCursor + 9.5,
+                  w: 4.4,
+                  h: 1.5,
+                  d: 1.0,
+                  moveAmp: 0,
+                  moveSpeed: 0,
+                  movePhase: 0,
+                  damagePool: dmgScale
+                });
+              }
+            }
+          }
+
+          zCursor += isEarly ? 28 : 27;
+        }
+
+        finishZ = zCursor + 12;
+
+        // 20 Staircase Multiplier Tiers (1.2x up to 5.0x)
+        const numSteps = 20;
+        const stepDepth = 4.2;
+        const stepHeight = 1.15;
+        for (let i = 0; i < numSteps; i++) {
+          const mult = +(1.2 + i * 0.2).toFixed(1);
+          stairs.push({
+            index: i,
+            z0: finishZ + i * stepDepth,
+            z1: finishZ + (i + 1) * stepDepth,
+            y: (i + 1) * stepHeight,
+            multiplier: mult,
+            label: `${mult.toFixed(1)}x`,
+            color: STAIR_COLORS[i % STAIR_COLORS.length]
+          });
+        }
+
+        // 5.0x Summit Boss Arena & Mega-Powerup Gauntlet
+        const topStep = stairs[stairs.length - 1];
+        bossArenaStartZ = topStep.z1;
+        bossArenaEndZ = bossArenaStartZ + 84;
+        bossGates.length = 0;
+
+        const gauntletZOffsets = [16, 34, 52];
+        const gauntletSpecs = [
+          [
+            { op: 'ADD', val: 150, label: '+150 ARMY', isPower: false },
+            { op: 'PWR', val: 2, label: '2x ATK DMG!', isPower: true }
+          ],
+          [
+            { op: 'MUL', val: 3, label: 'x3 ARMY', isPower: false },
+            { op: 'PWR', val: 3, label: '3x SUPER ATK!', isPower: true }
+          ],
+          [
+            { op: 'ADD', val: 400, label: '+400 LEGION', isPower: false },
+            { op: 'PWR', val: 4, label: 'MEGA CRIT!', isPower: true }
+          ]
+        ];
+
+        for (let g = 0; g < gauntletZOffsets.length; g++) {
+          const gz = bossArenaStartZ + gauntletZOffsets[g];
+          const pair = gauntletSpecs[g];
+          bossGates.push({
+            z: gz,
+            minX: -ROAD_HALF_WIDTH,
+            maxX: -0.15,
+            op: pair[0].op,
+            val: pair[0].val,
+            label: pair[0].label,
+            isPower: pair[0].isPower,
+            triggered: false,
+            pairId: 900 + g
+          });
+          bossGates.push({
+            z: gz,
+            minX: 0.15,
+            maxX: ROAD_HALF_WIDTH,
+            op: pair[1].op,
+            val: pair[1].val,
+            label: pair[1].label,
+            isPower: pair[1].isPower,
+            triggered: false,
+            pairId: 900 + g
+          });
+        }
+
+        const scaledBossHp = Math.round(1200 * (1 + (levelNum - 1) * 0.45) * Math.max(1, getStartingTroopsCount() * 0.35));
+        bossFightState.active = false;
+        bossFightState.arenaY = topStep.y;
+        bossFightState.bossX = 0;
+        bossFightState.bossZ = bossArenaStartZ + 72;
+        bossFightState.bossHp = scaledBossHp;
+        bossFightState.bossMaxHp = scaledBossHp;
+        bossFightState.powerLevel = 1;
+        bossFightState.attackTimer = 0;
+        bossFightState.bossSlamTimer = 1.6;
+        bossFightState.hitFlash = 0;
+        bossFightState.defeated = false;
+
+        // Flanking low-poly cliffs along the canyon
+        for (let z = -10; z <= bossArenaEndZ + 50; z += 17) {
+          for (let side = -1; side <= 1; side += 2) {
+            const innerX = side * (ROAD_HALF_WIDTH + 3.4 + Math.random() * 2.2);
+            const topW = 2.6 + Math.random() * 1.8;
+            const topD = 2.6 + Math.random() * 1.8;
+            const topY = 2.5 + Math.random() * 6.5;
+            cliffs.push({
+              x: innerX + side * (topW * 0.5),
+              z: z + (Math.random() - 0.5) * 4,
+              topW,
+              topD,
+              bottomW: topW + 4.8,
+              bottomD: topD + 4.8,
+              topY,
+              bottomY: -22
+            });
+
+            if (Math.random() > 0.25) {
+              const outerX = side * (ROAD_HALF_WIDTH + 10.5 + Math.random() * 4.5);
+              const oTopW = 3.2 + Math.random() * 2.2;
+              const oTopD = 3.2 + Math.random() * 2.2;
+              const oTopY = 5.5 + Math.random() * 8.5;
+              cliffs.push({
+                x: outerX + side * (oTopW * 0.5),
+                z: z + 6 + (Math.random() - 0.5) * 5,
+                topW: oTopW,
+                topD: oTopD,
+                bottomW: oTopW + 6.5,
+                bottomD: oTopD + 6.5,
+                topY: oTopY,
+                bottomY: -24
+              });
+            }
+          }
+        }
+        cliffs.sort((a, b) => b.z - a.z);
+      }
+
+      // ------------------------------------------------------------------------
+      // 8. ENDGAME GEOMETRIC HALVING PYRAMID STACK (1, 2, 4, 8, 16...)
+      // ------------------------------------------------------------------------
+      function formPyramidStack() {
+        const activeUnits = [];
+        for (let i = 0; i < MAX_VISUAL_CROWD; i++) {
+          if (crowdPool[i].active) activeUnits.push(crowdPool[i]);
+        }
+        const n = activeUnits.length;
+        if (n === 0) return;
+
+        const unitSpacingX = 0.68;
+        const unitSpacingY = 1.05;
+        const unitSpacingZ = 0.58;
+
+        const layers = [];
+        let remaining = n;
+        let capacity = 1;
+        while (remaining > 0) {
+          const countInLayer = Math.min(remaining, capacity);
+          layers.push(countInLayer);
+          remaining -= countInLayer;
+          capacity *= 2;
+        }
+
+        const totalLayers = layers.length;
+        gameState.pyramidLayers = layers;
+        gameState.pyramidTotalLayers = totalLayers;
+        gameState.activeBottomLayer = totalLayers - 1;
+
+        let unitIdx = 0;
+        for (let L = 0; L < totalLayers; L++) {
+          const count = layers[L];
+          const heightTier = (totalLayers - 1) - L;
+          const cols = Math.min(count, 10);
+          const rows = Math.ceil(count / cols);
+
+          for (let k = 0; k < count; k++) {
+            const u = activeUnits[unitIdx++];
+            const r = Math.floor(k / cols);
+            const c = k % cols;
+            const rowCount = (r === rows - 1 && count % cols !== 0) ? (count % cols) : cols;
+
+            u.pyramidLayer = L;
+            u.fallen = false;
+            u.pyramidSlotX = (c - (rowCount - 1) * 0.5) * unitSpacingX;
+            u.pyramidSlotY = heightTier * unitSpacingY;
+            u.pyramidSlotZ = (r - (rows - 1) * 0.5) * unitSpacingZ;
+          }
+        }
+      }
+
+      // ------------------------------------------------------------------------
+      // 9. INPUT CONTROLLER
+      // ------------------------------------------------------------------------
+      const keys = { left: false, right: false };
+      let isPointerDown = false;
+      let lastPointerX = 0;
+
+      const mainMenuOverlay = document.getElementById('mainMenuOverlay');
+      const startRunBtn = document.getElementById('startRunBtn');
+      const menuBtnHud = document.getElementById('menuBtnHud');
+      const btnUpgradeTroops = document.getElementById('btnUpgradeTroops');
+      const btnUpgradeIncome = document.getElementById('btnUpgradeIncome');
+      const troopCountLabel = document.getElementById('troopCountLabel');
+      const troopCostLabel = document.getElementById('troopCostLabel');
+      const incomeMultLabel = document.getElementById('incomeMultLabel');
+      const incomeCostLabel = document.getElementById('incomeCostLabel');
+      const menuStageTag = document.getElementById('menuStageTag');
+      const biomeSubtitle = document.getElementById('biomeSubtitle');
+      const crazyMenuBanner = document.getElementById('crazyMenuBanner');
+      const bossHud = document.getElementById('bossHud');
+      const bossHpText = document.getElementById('bossHpText');
+      const bossHpFill = document.getElementById('bossHpFill');
+
+      function startRunFromMenu() {
+        if (gameState.phase !== 'MENU') return;
+        gameState.phase = 'RUNNING';
+        mainMenuOverlay.classList.add('hidden');
+        menuBtnHud.classList.remove('hidden');
+      }
+
+      function updateUpgradeShopUI() {
+        const startTroops = getStartingTroopsCount();
+        const troopCost = getTroopUpgradeCost();
+        const incomePct = Math.round(getIncomeMultiplier() * 100);
+        const incomeCost = getIncomeUpgradeCost();
+
+        troopCountLabel.textContent = startTroops;
+        troopCostLabel.textContent = troopCost;
+        btnUpgradeTroops.disabled = savedProgress.coins < troopCost;
+
+        incomeMultLabel.textContent = `${incomePct}%`;
+        incomeCostLabel.textContent = incomeCost;
+        btnUpgradeIncome.disabled = savedProgress.coins < incomeCost;
+      }
+
+      startRunBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        startRunFromMenu();
+      });
+
+      menuBtnHud.addEventListener('click', (e) => {
+        e.stopPropagation();
+        enterMainMenu();
+      });
+
+      btnUpgradeTroops.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (gameState.phase !== 'MENU') return;
+        const cost = getTroopUpgradeCost();
+        if (savedProgress.coins >= cost) {
+          savedProgress.coins -= cost;
+          savedProgress.troopUpgradeLevel += 1;
+          persistProgress();
+          coinDisplay.textContent = savedProgress.coins;
+          setCrowdExact(getStartingTroopsCount(), gameState.playerX, gameState.playerZ);
+          spawnPopup('+2 TROOPS!', gameState.playerX, 2.3, gameState.playerZ, '#7dd3fc');
+          updateUpgradeShopUI();
+        }
+      });
+
+      btnUpgradeIncome.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (gameState.phase !== 'MENU') return;
+        const cost = getIncomeUpgradeCost();
+        if (savedProgress.coins >= cost) {
+          savedProgress.coins -= cost;
+          savedProgress.incomeUpgradeLevel += 1;
+          persistProgress();
+          coinDisplay.textContent = savedProgress.coins;
+          spawnPopup('+10% INCOME!', gameState.playerX, 2.3, gameState.playerZ, '#6ee7b7');
+          updateUpgradeShopUI();
+        }
+      });
+
+      window.addEventListener('keydown', (e) => {
+        if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
+          keys.left = true;
+          if (gameState.phase === 'MENU') startRunFromMenu();
+        }
+        if (e.code === 'ArrowRight' || e.code === 'KeyD') {
+          keys.right = true;
+          if (gameState.phase === 'MENU') startRunFromMenu();
+        }
+        if (e.code === 'Space' && gameState.phase === 'MENU') {
+          startRunFromMenu();
+        }
+      });
+
+      window.addEventListener('keyup', (e) => {
+        if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+        if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
+      });
+
+      canvas.addEventListener('pointerdown', (e) => {
+        if (gameState.phase === 'MENU') startRunFromMenu();
+        isPointerDown = true;
+        lastPointerX = e.clientX;
+      });
+
+      window.addEventListener('pointermove', (e) => {
+        if (!isPointerDown || (gameState.phase !== 'RUNNING' && gameState.phase !== 'BOSS_GAUNTLET')) return;
+        const deltaX = e.clientX - lastPointerX;
+        lastPointerX = e.clientX;
+        const sensitivity = (ROAD_HALF_WIDTH * 2.35) / Math.max(320, width * 0.55);
+        gameState.targetX += deltaX * sensitivity;
+      });
+
+      window.addEventListener('pointerup', () => {
+        isPointerDown = false;
+      });
+
+      // ------------------------------------------------------------------------
+      // 10. UI & LEVEL LIFECYCLE
+      // ------------------------------------------------------------------------
+      const levelBadge = document.getElementById('levelBadge');
+      const progressFill = document.getElementById('progressFill');
+      const coinDisplay = document.getElementById('coinDisplay');
+      const endModal = document.getElementById('endModal');
+      const modalBadge = document.getElementById('modalBadge');
+      const modalTitle = document.getElementById('modalTitle');
+      const modalSubtitle = document.getElementById('modalSubtitle');
+      const rewardCard = document.getElementById('rewardCard');
+      const statPeople = document.getElementById('statPeople');
+      const statMultiplier = document.getElementById('statMultiplier');
+      const statIncomeBoost = document.getElementById('statIncomeBoost');
+      const bossBonusRow = document.getElementById('bossBonusRow');
+      const statBossBonus = document.getElementById('statBossBonus');
+      const statCoinsEarned = document.getElementById('statCoinsEarned');
+      const modalActionBtn = document.getElementById('modalActionBtn');
+
+      let lastResultWasVictory = false;
+
+      function formatCompactNumber(num) {
+        if (num < 10000) return num.toLocaleString();
+        if (num < 1e6) return (num / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
+        if (num < 1e9) return (num / 1e6).toFixed(2).replace(/\.00$/, '') + 'M';
+        if (num < 1e12) return (num / 1e9).toFixed(2).replace(/\.00$/, '') + 'B';
+        return (num / 1e12).toFixed(2).replace(/\.00$/, '') + 'T';
+      }
+
+      function enterMainMenu() {
+        gameState.phase = 'MENU';
+        gameState.playerX = 0;
+        gameState.targetX = 0;
+        gameState.playerZ = 0;
+        gameState.collectedPeople = 0;
+        gameState.pyramidPeakMultiplier = 1.0;
+        gameState.pyramidLayers = [];
+        gameState.pyramidTotalLayers = 0;
+        gameState.activeBottomLayer = 0;
+        gameState.stairStepIndex = 0;
+        gameState.stairClimbTimer = 0;
+
+        bossHud.classList.add('hidden');
+        endModal.classList.add('hidden');
+        menuBtnHud.classList.add('hidden');
+        mainMenuOverlay.classList.remove('hidden');
+
+        clearCrowd();
+        buildLevel(savedProgress.level);
+        setCrowdExact(getStartingTroopsCount(), 0, 0);
+
+        camera.x = 0;
+        camera.y = 9.8;
+        camera.z = -11.5;
+
+        const isCrazyRound = (savedProgress.level % 5 === 0);
+        levelBadge.textContent = savedProgress.level;
+        biomeSubtitle.textContent = isCrazyRound
+          ? `STAGE ${savedProgress.level} • CRAZY BONUS`
+          : `STAGE ${savedProgress.level} • ${currentTheme.name.toUpperCase()}`;
+        menuStageTag.textContent = `STAGE ${savedProgress.level} • ${currentTheme.name.toUpperCase()}`;
+        if (isCrazyRound) {
+          crazyMenuBanner.classList.remove('hidden');
+        } else {
+          crazyMenuBanner.classList.add('hidden');
+        }
+
+        progressFill.style.width = '0%';
+        coinDisplay.textContent = formatCompactNumber(savedProgress.coins);
+        updateUpgradeShopUI();
+      }
+
+      function showEndModal(isVictory) {
+        lastResultWasVictory = isVictory;
+        gameState.phase = 'RESULT';
+        bossHud.classList.add('hidden');
+        menuBtnHud.classList.add('hidden');
+        endModal.classList.remove('hidden');
+
+        if (isVictory) {
+          const incomeMult = getIncomeMultiplier();
+          const bossJackpotMult = bossFightState.defeated ? 2.0 : 1.0;
+          const earned = Math.max(
+            1,
+            Math.round(gameState.collectedPeople * gameState.pyramidPeakMultiplier * incomeMult * bossJackpotMult)
+          );
+          savedProgress.coins += earned;
+          savedProgress.level += 1;
+          persistProgress();
+
+          coinDisplay.textContent = formatCompactNumber(savedProgress.coins);
+          modalBadge.textContent = bossFightState.defeated
+            ? 'COLOSSUS BOSS DEFEATED!'
+            : (savedProgress.level - 1) % 5 === 0
+              ? 'CRAZY BONUS CLEARED'
+              : 'STAGE COMPLETE';
+          modalBadge.className = 'inline-block px-3.5 py-1 rounded-full bg-emerald-100 text-emerald-700 font-black text-xs uppercase tracking-widest mb-2';
+          modalTitle.textContent = bossFightState.defeated ? 'BOSS SLAYER!' : 'VICTORY!';
+          modalSubtitle.textContent = bossFightState.defeated
+            ? `Reached 5.0x Summit & defeated the Colossus Boss!`
+            : `Your pyramid climbed to the ${gameState.pyramidPeakMultiplier.toFixed(1)}x tier!`;
+          rewardCard.classList.remove('hidden');
+          statPeople.textContent = formatCompactNumber(gameState.collectedPeople);
+          statMultiplier.textContent = `${gameState.pyramidPeakMultiplier.toFixed(1)}x`;
+          statIncomeBoost.textContent = `${Math.round(incomeMult * 100)}%`;
+
+          if (bossFightState.defeated) {
+            bossBonusRow.classList.remove('hidden');
+            statBossBonus.textContent = '2.0x';
+          } else {
+            bossBonusRow.classList.add('hidden');
+          }
+
+          statCoinsEarned.textContent = `+${formatCompactNumber(earned)}`;
+          modalActionBtn.textContent = 'CONTINUE';
+        } else {
+          modalBadge.textContent = 'OUT OF TROOPS';
+          modalBadge.className = 'inline-block px-3.5 py-1 rounded-full bg-rose-100 text-rose-700 font-black text-xs uppercase tracking-widest mb-2';
+          modalTitle.textContent = 'WIPED OUT!';
+          modalSubtitle.textContent = 'Protect the King and watch out for traps & chasms!';
+          rewardCard.classList.add('hidden');
+          modalActionBtn.textContent = 'TRY AGAIN';
+        }
+      }
+
+      modalActionBtn.addEventListener('click', () => {
+        enterMainMenu();
+      });
+
+      // ------------------------------------------------------------------------
+      // 11. SIMULATION UPDATE STEP (DELTA-TIME DRIVEN)
+      // ------------------------------------------------------------------------
+      function update(dt) {
+        if (camera.shakeTimer > 0) {
+          camera.shakeTimer = Math.max(0, camera.shakeTimer - dt);
+        }
+
+        // Update particles
+        for (let i = 0; i < MAX_PARTICLES; i++) {
+          const p = particlePool[i];
+          if (!p.active) continue;
+          p.life += dt;
+          if (p.life >= p.maxLife) {
+            p.active = false;
+            continue;
+          }
+          p.vy -= 18 * dt;
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.z += p.vz * dt;
+        }
+
+        // Update popups
+        for (let i = 0; i < MAX_POPUPS; i++) {
+          const pop = popupPool[i];
+          if (!pop.active) continue;
+          pop.life += dt;
+          if (pop.life >= pop.maxLife) {
+            pop.active = false;
+            continue;
+          }
+          pop.y += 2.2 * dt;
+        }
+
+        // Animate moving obstacles
+        for (let i = 0; i < obstacles.length; i++) {
+          const obs = obstacles[i];
+          if (obs.kind === 'SAWBLADE') {
+            obs.spinAngle += 7.5 * dt;
+            if (obs.moveAmp > 0) {
+              obs.movePhase += obs.moveSpeed * dt;
+              obs.x = obs.baseX + Math.sin(obs.movePhase) * obs.moveAmp;
+            }
+          } else if (obs.kind === 'MOVING_WALL') {
+            obs.movePhase += obs.moveSpeed * dt;
+            obs.x = obs.baseX + Math.sin(obs.movePhase) * obs.moveAmp;
+          }
+        }
+
+        if (gameState.phase === 'MENU') {
+          let followerIdx = 0;
+          for (let i = 0; i < MAX_VISUAL_CROWD; i++) {
+            const u = crowdPool[i];
+            if (!u.active) continue;
+            u.phase += 4.5 * dt;
+            u.scalePop += (1 - u.scalePop) * Math.min(1, 12 * dt);
+
+            if (u.isLeader) {
+              u.x = 0;
+              u.z = 0.45;
+              u.y = Math.abs(Math.sin(u.phase)) * 0.08;
+            } else {
+              const radius = 0.42 + Math.sqrt(followerIdx) * 0.25;
+              const angle = (followerIdx * GOLDEN_ANGLE) % Math.PI;
+              const targetX = Math.cos(angle) * radius;
+              const targetZ = -0.35 - Math.sin(angle) * radius * 1.15;
+              u.x += (targetX - u.x) * Math.min(1, 10 * dt);
+              u.z += (targetZ - u.z) * Math.min(1, 10 * dt);
+              u.y = Math.abs(Math.sin(u.phase)) * 0.06;
+              followerIdx++;
+            }
+          }
+          camera.x += (0 - camera.x) * Math.min(1, 8 * dt);
+          camera.y += (9.8 - camera.y) * Math.min(1, 8 * dt);
+          camera.z += (-11.5 - camera.z) * Math.min(1, 8 * dt);
+          return;
+        }
+
+        if (gameState.phase === 'RUNNING') {
+          const steerSpeed = 14.5;
+          if (keys.left) gameState.targetX -= steerSpeed * dt;
+          if (keys.right) gameState.targetX += steerSpeed * dt;
+
+          const maxLateral = ROAD_HALF_WIDTH - 0.38;
+          gameState.targetX = Math.max(-maxLateral, Math.min(maxLateral, gameState.targetX));
+          gameState.playerX += (gameState.targetX - gameState.playerX) * Math.min(1, 18 * dt);
+
+          const forwardDelta = gameState.runSpeed * dt;
+          gameState.playerZ += forwardDelta;
+
+          const pct = Math.min(100, Math.max(0, (gameState.playerZ / finishZ) * 100));
+          progressFill.style.width = `${pct.toFixed(1)}%`;
+
+          // Leader & trailing wedge flocking + Chasm Gap & Ramp Jump Physics
+          const springK = 36;
+          const damping = 9.5;
+          let followerIdx = 0;
+
+          for (let i = 0; i < MAX_VISUAL_CROWD; i++) {
+            const u = crowdPool[i];
+            if (!u.active) continue;
+            u.phase += 16 * dt;
+            u.scalePop += (1 - u.scalePop) * Math.min(1, 14 * dt);
+
+            if (u.isLeader) {
+              u.x = gameState.playerX;
+              u.z = gameState.playerZ + 0.45;
+              u.y = Math.abs(Math.sin(u.phase)) * 0.14;
+            } else {
+              u.z += forwardDelta;
+              const radius = 0.42 + Math.sqrt(followerIdx) * 0.25;
+              const angle = (followerIdx * GOLDEN_ANGLE) % Math.PI;
+              const targetX = gameState.playerX + Math.cos(angle) * radius;
+              const targetZ = gameState.playerZ - 0.35 - Math.sin(angle) * radius * 1.15;
+
+              const ax = (targetX - u.x) * springK - u.vx * damping;
+              const az = (targetZ - u.z) * springK - u.vz * damping;
+              u.vx += ax * dt;
+              u.vz += az * dt;
+              u.x += u.vx * dt;
+              u.z += u.vz * dt;
+              u.y = Math.abs(Math.sin(u.phase)) * 0.11;
+
+              const bound = ROAD_HALF_WIDTH - 0.32;
+              if (u.x < -bound) { u.x = -bound; u.vx = 0; }
+              if (u.x > bound) { u.x = bound; u.vx = 0; }
+              followerIdx++;
+            }
+
+            // Chasm Gaps & Left/Right Launch Ramps
+            const rampApproachZ = 2.6;
+            for (let gIdx = 0; gIdx < gapZones.length; gIdx++) {
+              const gz = gapZones[gIdx];
+              const gapLen = gz.zEnd - gz.zStart;
+
+              if (u.z >= gz.zStart - rampApproachZ && u.z < gz.zStart) {
+                const onRampX = u.x >= gz.rampMinX && u.x <= gz.rampMaxX;
+                if (onRampX) {
+                  const rampT = (u.z - (gz.zStart - rampApproachZ)) / rampApproachZ;
+                  u.y += rampT * 1.25;
+                }
+              }
+
+              if (u.z >= gz.zStart && u.z <= gz.zEnd) {
+                const jumpT = (u.z - gz.zStart) / gapLen;
+                const onRampLane = u.x >= gz.rampMinX - 0.22 && u.x <= gz.rampMaxX + 0.22;
+
+                if (u.isLeader) {
+                  if (onRampLane) {
+                    gz.kingCrossed = true;
+                    u.y = 1.25 * (1 - jumpT) + Math.sin(jumpT * Math.PI) * 2.55;
+                  } else {
+                    spawnParticleBurst(u.x, 0.2, u.z, 32, '#38bdf8', 7.5);
+                    spawnPopup('FELL IN ABYSS!', u.x, 2.0, u.z, '#fda4af');
+                    clearCrowd();
+                    camera.shakeTimer = 0.28;
+                    camera.shakeIntensity = 0.42;
+                    showEndModal(false);
+                    return;
+                  }
+                } else {
+                  if (onRampLane && gz.survivedCount < gz.maxSurvivors) {
+                    if (u.jumpProgress !== gIdx) {
+                      u.jumpProgress = gIdx;
+                      gz.survivedCount++;
+                      if (gz.survivedCount === gz.maxSurvivors && !gz.capPopupShown) {
+                        gz.capPopupShown = true;
+                        spawnPopup(`RAMP FULL! (${gz.maxSurvivors} MAX)`, (gz.rampMinX + gz.rampMaxX) * 0.5, 3.2, gz.zStart + 2, '#fde047');
+                      }
+                    }
+                    u.y = 1.25 * (1 - jumpT) + Math.sin(jumpT * Math.PI) * 2.55;
+                  } else {
+                    u.y -= 18 * dt;
+                    if (jumpT > 0.35 || u.y < -1.8) {
+                      spawnParticleBurst(u.x, -0.5, u.z, 3, '#7dd3fc', 4.5);
+                      u.active = false;
+                      visualActiveCount--;
+                      activeCount = Math.max(1, activeCount - 1);
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          // Clamp logical activeCount to gap ramp capacity once past the gap
+          for (let gIdx = 0; gIdx < gapZones.length; gIdx++) {
+            const gz = gapZones[gIdx];
+            if (gameState.playerZ > gz.zEnd + 1.5 && !gz.enforcedLogicalCap) {
+              gz.enforcedLogicalCap = true;
+              if (activeCount > gz.maxSurvivors) {
+                const dropped = activeCount - gz.maxSurvivors;
+                activeCount = gz.maxSurvivors;
+                syncVisualProxies(gameState.playerX, gameState.playerZ);
+                spawnPopup(`-${formatCompactNumber(dropped)} FELL!`, gameState.playerX, 2.4, gz.zEnd, '#fda4af');
+              }
+            }
+          }
+
+          applySpatialSeparation(dt, 0.38, 42);
+
+          // Math Gates
+          for (let i = 0; i < gates.length; i++) {
+            const g = gates[i];
+            if (g.triggered) continue;
+            if (gameState.playerZ >= g.z - 0.35 && gameState.playerZ <= g.z + 0.85) {
+              if (gameState.playerX >= g.minX && gameState.playerX <= g.maxX) {
+                g.triggered = true;
+                for (let j = 0; j < gates.length; j++) {
+                  if (gates[j].pairId === g.pairId) gates[j].triggered = true;
+                }
+
+                let newCount = activeCount;
+                if (g.op === 'MUL') newCount = activeCount * g.val;
+                else if (g.op === 'ADD') newCount = activeCount + g.val;
+                else if (g.op === 'SUB') newCount = Math.max(0, activeCount - g.val);
+                else if (g.op === 'DIV') newCount = Math.floor(activeCount / g.val);
+
+                setCrowdExact(newCount, gameState.playerX, gameState.playerZ);
+                spawnPopup(g.label, (g.minX + g.maxX) * 0.5, 2.4, g.z, g.isTrap ? '#fda4af' : '#fef08a');
+
+                if (activeCount <= 0) {
+                  clearCrowd();
+                  showEndModal(false);
+                  return;
+                }
+              }
+            }
+          }
+
+          // Solid Obstacles: clear every unit in their path; hitting the King is instant loss
+          for (let i = 0; i < obstacles.length; i++) {
+            const obs = obstacles[i];
+            if (Math.abs(obs.z - gameState.playerZ) > 9.0) continue;
+
+            let kingHit = false;
+            let unitsCleared = 0;
+
+            for (let uIdx = 0; uIdx < MAX_VISUAL_CROWD; uIdx++) {
+              const u = crowdPool[uIdx];
+              if (!u.active) continue;
+
+              let hit = false;
+              if (obs.kind === 'SAWBLADE') {
+                const dx = u.x - obs.x;
+                const dz = u.z - obs.z;
+                const hitR = obs.radius + (u.isLeader ? 0.28 : 0.22);
+                hit = (dx * dx + dz * dz) <= hitR * hitR;
+              } else {
+                const halfW = obs.w * 0.5 + (u.isLeader ? 0.22 : 0.18);
+                const halfD = obs.d * 0.5 + (u.isLeader ? 0.25 : 0.2);
+                hit = Math.abs(u.x - obs.x) <= halfW && Math.abs(u.z - obs.z) <= halfD;
+              }
+
+              if (hit) {
+                if (u.isLeader) {
+                  kingHit = true;
+                  break;
+                } else {
+                  spawnParticleBurst(u.x, 0.7, u.z, 3, '#f87171', 5.2);
+                  u.active = false;
+                  visualActiveCount--;
+                  unitsCleared++;
+                }
+              }
+            }
+
+            if (kingHit) {
+              spawnParticleBurst(gameState.playerX, 0.9, gameState.playerZ, 36, '#ef4444', 8.0);
+              spawnPopup('KING DEFEATED!', gameState.playerX, 2.5, gameState.playerZ, '#fda4af');
+              clearCrowd();
+              camera.shakeTimer = 0.28;
+              camera.shakeIntensity = 0.42;
+              showEndModal(false);
+              return;
+            }
+
+            if (unitsCleared > 0) {
+              const ratio = activeCount > MAX_VISUAL_CROWD ? Math.ceil(activeCount / MAX_VISUAL_CROWD) : 1;
+              const totalLost = unitsCleared * ratio;
+              activeCount = Math.max(1, activeCount - totalLost);
+              camera.shakeTimer = 0.12;
+              camera.shakeIntensity = 0.22;
+            }
+          }
+
+          // Check Finish Line -> Form Geometric Halving Pyramid Stack
+          if (gameState.playerZ >= finishZ) {
+            gameState.phase = 'STAIRCASE';
+            gameState.collectedPeople = activeCount;
+            gameState.stairStepIndex = 0;
+            gameState.stairClimbTimer = 0;
+
+            formPyramidStack();
+            gameState.pyramidPeakMultiplier = stairs[0].multiplier;
+            spawnPopup(`${gameState.pyramidPeakMultiplier.toFixed(1)}x`, 0, 2.8, stairs[0].z0 + 2, '#fef08a');
+          }
+
+          camera.x += (gameState.playerX * 0.35 - camera.x) * Math.min(1, 6 * dt);
+          camera.y += (9.8 - camera.y) * Math.min(1, 6 * dt);
+          camera.z = gameState.playerZ - 11.5;
+
+        } else if (gameState.phase === 'STAIRCASE') {
+          gameState.stairClimbTimer += dt;
+          const activeStep = stairs[gameState.stairStepIndex];
+          const targetZ = (activeStep.z0 + activeStep.z1) * 0.5;
+          const targetY = activeStep.y;
+
+          gameState.playerX += (0 - gameState.playerX) * Math.min(1, 8 * dt);
+          gameState.playerZ += (targetZ - gameState.playerZ) * Math.min(1, 10 * dt);
+
+          const tierInterval = 0.24;
+          if (gameState.stairClimbTimer >= tierInterval) {
+            gameState.stairClimbTimer = 0;
+
+            if (gameState.activeBottomLayer > 0) {
+              const shedLayer = gameState.activeBottomLayer;
+              for (let i = 0; i < MAX_VISUAL_CROWD; i++) {
+                const u = crowdPool[i];
+                if (u.active && !u.fallen && u.pyramidLayer === shedLayer) {
+                  u.fallen = true;
+                  u.y = targetY;
+                  u.z = targetZ + (Math.random() - 0.5) * 0.5;
+                }
+              }
+
+              gameState.activeBottomLayer--;
+              const remainingLayers = gameState.activeBottomLayer + 1;
+              for (let i = 0; i < MAX_VISUAL_CROWD; i++) {
+                const u = crowdPool[i];
+                if (u.active && !u.fallen) {
+                  const newHeightTier = (remainingLayers - 1) - u.pyramidLayer;
+                  u.pyramidSlotY = newHeightTier * 1.05;
+                }
+              }
+
+              if (gameState.stairStepIndex < stairs.length - 1) {
+                gameState.stairStepIndex++;
+                const nextStep = stairs[gameState.stairStepIndex];
+                gameState.pyramidPeakMultiplier = nextStep.multiplier;
+                spawnPopup(nextStep.label, 0, nextStep.y + 2.2, (nextStep.z0 + nextStep.z1) * 0.5, '#fef08a');
+                spawnParticleBurst(0, nextStep.y + 0.5, nextStep.z0, 14, nextStep.color, 4.2);
+              } else {
+                // Reached 5.0x Summit -> Launch Boss Arena!
+                gameState.pyramidPeakMultiplier = 5.0;
+                gameState.phase = 'BOSS_GAUNTLET';
+                bossFightState.active = true;
+                bossFightState.arenaY = targetY;
+                gameState.playerZ = bossArenaStartZ + 2.5;
+                gameState.playerX = 0;
+                gameState.targetX = 0;
+
+                for (let i = 0; i < MAX_VISUAL_CROWD; i++) {
+                  const u = crowdPool[i];
+                  if (u.active) {
+                    u.fallen = false;
+                    u.pyramidLayer = -1;
+                    u.y = targetY;
+                    u.z = gameState.playerZ - Math.random() * 2.0;
+                  }
+                }
+                spawnPopup('5.0x SUMMIT! BOSS ARENA!', 0, targetY + 3.4, bossArenaStartZ + 4, '#fde047');
+                spawnParticleBurst(0, targetY + 1.5, bossArenaStartZ + 4, 34, '#facc15', 7.5);
+                return;
+              }
+            } else {
+              // Apex reached! If on 5.0x step, enter Boss Arena; otherwise finish stage
+              if (gameState.stairStepIndex >= stairs.length - 1) {
+                gameState.pyramidPeakMultiplier = 5.0;
+                gameState.phase = 'BOSS_GAUNTLET';
+                bossFightState.active = true;
+                bossFightState.arenaY = targetY;
+                gameState.playerZ = bossArenaStartZ + 2.5;
+                gameState.playerX = 0;
+                gameState.targetX = 0;
+
+                for (let i = 0; i < MAX_VISUAL_CROWD; i++) {
+                  const u = crowdPool[i];
+                  if (u.active) {
+                    u.fallen = false;
+                    u.pyramidLayer = -1;
+                    u.y = targetY;
+                    u.z = gameState.playerZ - Math.random() * 2.0;
+                  }
+                }
+                spawnPopup('5.0x SUMMIT! BOSS ARENA!', 0, targetY + 3.4, bossArenaStartZ + 4, '#fde047');
+                spawnParticleBurst(0, targetY + 1.5, bossArenaStartZ + 4, 34, '#facc15', 7.5);
+                return;
+              }
+
+              for (let i = 0; i < MAX_VISUAL_CROWD; i++) {
+                const u = crowdPool[i];
+                if (u.active && !u.fallen) {
+                  u.fallen = true;
+                  u.y = targetY;
+                }
+              }
+              spawnParticleBurst(0, targetY + 1.2, targetZ, 30, '#facc15', 6.5);
+              showEndModal(true);
+              return;
+            }
+          }
+
+          for (let i = 0; i < MAX_VISUAL_CROWD; i++) {
+            const u = crowdPool[i];
+            if (!u.active || u.fallen) continue;
+            u.x += (u.pyramidSlotX - u.x) * Math.min(1, 14 * dt);
+            u.y += (targetY + u.pyramidSlotY - u.y) * Math.min(1, 14 * dt);
+            u.z += (targetZ + u.pyramidSlotZ - u.z) * Math.min(1, 14 * dt);
+          }
+
+          camera.x += (0 - camera.x) * Math.min(1, 5 * dt);
+          camera.y += (9.8 + targetY * 0.72 - camera.y) * Math.min(1, 5 * dt);
+          camera.z += (targetZ - 13.5 - camera.z) * Math.min(1, 5 * dt);
+
+        } else if (gameState.phase === 'BOSS_GAUNTLET') {
+          const arenaY = bossFightState.arenaY;
+          const steerSpeed = 14.5;
+          if (keys.left) gameState.targetX -= steerSpeed * dt;
+          if (keys.right) gameState.targetX += steerSpeed * dt;
+
+          const maxLateral = ROAD_HALF_WIDTH - 0.38;
+          gameState.targetX = Math.max(-maxLateral, Math.min(maxLateral, gameState.targetX));
+          gameState.playerX += (gameState.targetX - gameState.playerX) * Math.min(1, 18 * dt);
+
+          const forwardDelta = (gameState.runSpeed * 0.92) * dt;
+          gameState.playerZ += forwardDelta;
+
+          const springK = 36;
+          const damping = 9.5;
+          let followerIdx = 0;
+          for (let i = 0; i < MAX_VISUAL_CROWD; i++) {
+            const u = crowdPool[i];
+            if (!u.active) continue;
+            u.phase += 16 * dt;
+            u.scalePop += (1 - u.scalePop) * Math.min(1, 14 * dt);
+            if (u.isLeader) {
+              u.x = gameState.playerX;
+              u.z = gameState.playerZ + 0.45;
+              u.y = arenaY + Math.abs(Math.sin(u.phase)) * 0.14;
+            } else {
+              u.z += forwardDelta;
+              const radius = 0.42 + Math.sqrt(followerIdx) * 0.25;
+              const angle = (followerIdx * GOLDEN_ANGLE) % Math.PI;
+              const targetX = gameState.playerX + Math.cos(angle) * radius;
+              const targetZ = gameState.playerZ - 0.35 - Math.sin(angle) * radius * 1.15;
+              const ax = (targetX - u.x) * springK - u.vx * damping;
+              const az = (targetZ - u.z) * springK - u.vz * damping;
+              u.vx += ax * dt;
+              u.vz += az * dt;
+              u.x += u.vx * dt;
+              u.z += u.vz * dt;
+              u.y = arenaY + Math.abs(Math.sin(u.phase)) * 0.11;
+              followerIdx++;
+            }
+          }
+          applySpatialSeparation(dt, 0.38, 42);
+
+          for (let i = 0; i < bossGates.length; i++) {
+            const bg = bossGates[i];
+            if (bg.triggered) continue;
+            if (gameState.playerZ >= bg.z - 0.4 && gameState.playerZ <= bg.z + 0.9) {
+              if (gameState.playerX >= bg.minX && gameState.playerX <= bg.maxX) {
+                bg.triggered = true;
+                for (let j = 0; j < bossGates.length; j++) {
+                  if (bossGates[j].pairId === bg.pairId) bossGates[j].triggered = true;
+                }
+                if (bg.op === 'ADD') {
+                  setCrowdExact(activeCount + bg.val, gameState.playerX, gameState.playerZ);
+                } else if (bg.op === 'MUL') {
+                  setCrowdExact(activeCount * bg.val, gameState.playerX, gameState.playerZ);
+                } else if (bg.op === 'PWR') {
+                  bossFightState.powerLevel *= bg.val;
+                }
+                gameState.collectedPeople = activeCount;
+                spawnPopup(bg.label, (bg.minX + bg.maxX) * 0.5, arenaY + 2.6, bg.z, '#fde047');
+                spawnParticleBurst(gameState.playerX, arenaY + 1.0, bg.z, 22, '#facc15', 6.2);
+              }
+            }
+          }
+
+          if (gameState.playerZ >= bossFightState.bossZ - 3.6) {
+            gameState.phase = 'BOSS_FIGHT';
+            bossHud.classList.remove('hidden');
+            bossHpText.textContent = `${formatCompactNumber(bossFightState.bossHp)} / ${formatCompactNumber(bossFightState.bossMaxHp)}`;
+            bossHpFill.style.width = '100%';
+            spawnPopup('ATTACK THE BOSS!', 0, arenaY + 4.2, bossFightState.bossZ, '#fda4af');
+          }
+
+          camera.x += (gameState.playerX * 0.35 - camera.x) * Math.min(1, 6 * dt);
+          camera.y += (9.8 + arenaY - camera.y) * Math.min(1, 8 * dt);
+          camera.z = gameState.playerZ - 11.5;
+
+        } else if (gameState.phase === 'BOSS_FIGHT') {
+          const arenaY = bossFightState.arenaY;
+          const bx = bossFightState.bossX;
+          const bz = bossFightState.bossZ;
+
+          if (bossFightState.hitFlash > 0) {
+            bossFightState.hitFlash = Math.max(0, bossFightState.hitFlash - dt * 4);
+          }
+
+          let idx = 0;
+          for (let i = 0; i < MAX_VISUAL_CROWD; i++) {
+            const u = crowdPool[i];
+            if (!u.active) continue;
+            u.phase += 22 * dt;
+            const ringAngle = (idx * GOLDEN_ANGLE) % (Math.PI * 1.4) - Math.PI * 0.2;
+            const dist = u.isLeader ? 2.1 : 2.3 + Math.sqrt(idx) * 0.24;
+            const tx = bx + Math.cos(ringAngle) * dist;
+            const tz = bz - 1.2 - Math.abs(Math.sin(ringAngle)) * dist * 0.85;
+            u.x += (tx - u.x) * Math.min(1, 9 * dt);
+            u.z += (tz - u.z) * Math.min(1, 9 * dt);
+            u.y = arenaY + Math.abs(Math.sin(u.phase)) * 0.25;
+            idx++;
+          }
+
+          bossFightState.attackTimer += dt;
+          if (bossFightState.attackTimer >= 0.22) {
+            bossFightState.attackTimer = 0;
+            const dmg = Math.max(15, Math.round(activeCount * 1.35 * bossFightState.powerLevel));
+            bossFightState.bossHp = Math.max(0, bossFightState.bossHp - dmg);
+            bossFightState.hitFlash = 1.0;
+
+            const hpPct = Math.max(0, (bossFightState.bossHp / bossFightState.bossMaxHp) * 100);
+            bossHpFill.style.width = `${hpPct.toFixed(1)}%`;
+            bossHpText.textContent = `${formatCompactNumber(bossFightState.bossHp)} / ${formatCompactNumber(bossFightState.bossMaxHp)}`;
+
+            spawnParticleBurst(bx + (Math.random() - 0.5) * 1.8, arenaY + 2.2, bz - 0.8, 7, '#fde047', 5.5);
+            spawnPopup(`-${formatCompactNumber(dmg)}`, bx + (Math.random() - 0.5) * 2.4, arenaY + 4.4, bz, '#fef08a');
+
+            if (bossFightState.bossHp <= 0) {
+              bossFightState.defeated = true;
+              camera.shakeTimer = 0.4;
+              camera.shakeIntensity = 0.55;
+              spawnParticleBurst(bx, arenaY + 2.5, bz, 60, '#facc15', 10.5);
+              showEndModal(true);
+              return;
+            }
+          }
+
+          bossFightState.bossSlamTimer -= dt;
+          if (bossFightState.bossSlamTimer <= 0) {
+            bossFightState.bossSlamTimer = 1.45;
+            camera.shakeTimer = 0.22;
+            camera.shakeIntensity = 0.35;
+            const slamLoss = Math.max(2, Math.floor(activeCount * 0.14));
+            if (activeCount - slamLoss >= 1) {
+              setCrowdExact(activeCount - slamLoss, bx, bz - 2.2);
+              spawnPopup(`BOSS SLAM! -${formatCompactNumber(slamLoss)}`, bx, arenaY + 3.2, bz - 1.5, '#fda4af');
+            }
+          }
+
+          camera.x += (0 - camera.x) * Math.min(1, 5 * dt);
+          camera.y += (10.5 + arenaY - camera.y) * Math.min(1, 5 * dt);
+          camera.z += (bz - 15.0 - camera.z) * Math.min(1, 5 * dt);
+        }
+      }
+
+      // ------------------------------------------------------------------------
+      // 12. 3D / 2.5D RENDER PIPELINE
+      // ------------------------------------------------------------------------
+      function drawQuad3D(x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, fillStyle, strokeStyle = null) {
+        project3D(x0, y0, z0, pA);
+        project3D(x1, y1, z1, pB);
+        project3D(x2, y2, z2, pC);
+        project3D(x3, y3, z3, pD);
+        if (!pA.visible || !pB.visible || !pC.visible || !pD.visible) return;
+
+        ctx.beginPath();
+        ctx.moveTo(pA.sx, pA.sy);
+        ctx.lineTo(pB.sx, pB.sy);
+        ctx.lineTo(pC.sx, pC.sy);
+        ctx.lineTo(pD.sx, pD.sy);
+        ctx.closePath();
+        ctx.fillStyle = fillStyle;
+        ctx.fill();
+        if (strokeStyle) {
+          ctx.strokeStyle = strokeStyle;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+      }
+
+      function drawSky() {
+        const grad = ctx.createLinearGradient(0, 0, 0, height);
+        grad.addColorStop(0, currentTheme.skyTop);
+        grad.addColorStop(0.52, currentTheme.skyMid);
+        grad.addColorStop(1, currentTheme.skyHorizon);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, width, height);
+      }
+
+      function drawCliffs() {
+        for (let i = 0; i < cliffs.length; i++) {
+          const c = cliffs[i];
+          const dz = c.z - camera.z;
+          if (dz < -15 || dz > DRAW_DISTANCE) continue;
+
+          const fog = fogFactor(dz);
+          const leftFaceCol = blendFog(currentTheme.cliffLeft, fog);
+          const rightFaceCol = blendFog(currentTheme.cliffRight, fog);
+          const capCol = blendFog(currentTheme.cliffCap, fog);
+          const snowLipCol = blendFog(currentTheme.cliffSnow, fog);
+
+          const hTopW = c.topW * 0.5;
+          const hTopD = c.topD * 0.5;
+          const hBotW = c.bottomW * 0.5;
+          const hBotD = c.bottomD * 0.5;
+
+          const tlFront = { x: c.x - hTopW, y: c.topY, z: c.z - hTopD };
+          const trFront = { x: c.x + hTopW, y: c.topY, z: c.z - hTopD };
+          const trBack  = { x: c.x + hTopW, y: c.topY, z: c.z + hTopD };
+          const tlBack  = { x: c.x - hTopW, y: c.topY, z: c.z + hTopD };
+
+          const blFront = { x: c.x - hBotW, y: c.bottomY, z: c.z - hBotD };
+          const brFront = { x: c.x + hBotW, y: c.bottomY, z: c.z - hBotD };
+          const brBack  = { x: c.x + hBotW, y: c.bottomY, z: c.z + hBotD };
+          const blBack  = { x: c.x - hBotW, y: c.bottomY, z: c.z + hBotD };
+
+          drawQuad3D(
+            tlFront.x, tlFront.y, tlFront.z,
+            trFront.x, trFront.y, trFront.z,
+            brFront.x, brFront.y, brFront.z,
+            blFront.x, blFront.y, blFront.z,
+            leftFaceCol
+          );
+
+          if (c.x < 0) {
+            drawQuad3D(
+              trFront.x, trFront.y, trFront.z,
+              trBack.x, trBack.y, trBack.z,
+              brBack.x, brBack.y, brBack.z,
+              brFront.x, brFront.y, brFront.z,
+              rightFaceCol
+            );
+          } else {
+            drawQuad3D(
+              tlBack.x, tlBack.y, tlBack.z,
+              tlFront.x, tlFront.y, tlFront.z,
+              blFront.x, blFront.y, blFront.z,
+              blBack.x, blBack.y, blBack.z,
+              rightFaceCol
+            );
+          }
+
+          drawQuad3D(
+            tlFront.x, tlFront.y, tlFront.z,
+            trFront.x, trFront.y, trFront.z,
+            trBack.x, trBack.y, trBack.z,
+            tlBack.x, tlBack.y, tlBack.z,
+            capCol
+          );
+
+          const collarY = c.topY - 0.85;
+          const collarW = hTopW + 0.14;
+          const collarD = hTopD + 0.14;
+          drawQuad3D(
+            c.x - hTopW, c.topY, c.z - hTopD,
+            c.x + hTopW, c.topY, c.z - hTopD,
+            c.x + collarW, collarY, c.z - collarD,
+            c.x - collarW, collarY, c.z - collarD,
+            snowLipCol
+          );
+        }
+      }
+
+      function drawRoadAndStairs() {
+        const minTileIdx = Math.max(-3, Math.floor((camera.z - 2) / 4));
+        const maxTileIdx = Math.min(Math.ceil(finishZ / 4), Math.ceil((camera.z + DRAW_DISTANCE) / 4));
+
+        // Road surface strips, chevrons & white guardrails (skipping chasm gaps)
+        for (let idx = maxTileIdx - 1; idx >= minTileIdx; idx--) {
+          const z0 = idx * 4;
+          const z1 = Math.min(finishZ, z0 + 4);
+          if (z1 <= z0) continue;
+
+          let insideGap = null;
+          for (let g = 0; g < gapZones.length; g++) {
+            const gz = gapZones[g];
+            if (z1 > gz.zStart + 0.1 && z0 < gz.zEnd - 0.1) {
+              insideGap = gz;
+              break;
+            }
+          }
+          if (insideGap) continue;
+
+          const dz = z0 - camera.z;
+          const fog = fogFactor(dz);
+          const isAlt = (idx % 2 === 0);
+
+          const deckCol = blendFog(isAlt ? currentTheme.roadDark : currentTheme.roadStripe, fog);
+          const railTopCol = blendFog(currentTheme.railTop, fog);
+          const railSideCol = blendFog(currentTheme.railSide, fog);
+
+          drawQuad3D(
+            -ROAD_HALF_WIDTH, 0, z0,
+            ROAD_HALF_WIDTH, 0, z0,
+            ROAD_HALF_WIDTH, 0, z1,
+            -ROAD_HALF_WIDTH, 0, z1,
+            deckCol
+          );
+
+          if (isAlt && z1 - z0 >= 3.2) {
+            const chevCol = blendFog(currentTheme.roadStripe, fog * 0.85);
+            const midZ = (z0 + z1) * 0.5;
+            drawQuad3D(-2.3, 0.01, z0 + 0.7, 0, 0.01, midZ + 0.5, 0, 0.01, midZ + 1.3, -2.3, 0.01, z0 + 1.5, chevCol);
+            drawQuad3D(2.3, 0.01, z0 + 0.7, 0, 0.01, midZ + 0.5, 0, 0.01, midZ + 1.3, 2.3, 0.01, z0 + 1.5, chevCol);
+          }
+
+          drawQuad3D(
+            -ROAD_HALF_WIDTH - RAIL_WIDTH, 0.28, z0,
+            -ROAD_HALF_WIDTH, 0.28, z0,
+            -ROAD_HALF_WIDTH, 0.28, z1,
+            -ROAD_HALF_WIDTH - RAIL_WIDTH, 0.28, z1,
+            railTopCol
+          );
+          drawQuad3D(
+            -ROAD_HALF_WIDTH - RAIL_WIDTH, 0.28, z0,
+            -ROAD_HALF_WIDTH - RAIL_WIDTH, -5, z0,
+            -ROAD_HALF_WIDTH - RAIL_WIDTH, -5, z1,
+            -ROAD_HALF_WIDTH - RAIL_WIDTH, 0.28, z1,
+            railSideCol
+          );
+
+          drawQuad3D(
+            ROAD_HALF_WIDTH, 0.28, z0,
+            ROAD_HALF_WIDTH + RAIL_WIDTH, 0.28, z0,
+            ROAD_HALF_WIDTH + RAIL_WIDTH, 0.28, z1,
+            ROAD_HALF_WIDTH, 0.28, z1,
+            railTopCol
+          );
+          drawQuad3D(
+            ROAD_HALF_WIDTH + RAIL_WIDTH, 0.28, z0,
+            ROAD_HALF_WIDTH + RAIL_WIDTH, -5, z0,
+            ROAD_HALF_WIDTH + RAIL_WIDTH, -5, z1,
+            ROAD_HALF_WIDTH + RAIL_WIDTH, 0.28, z1,
+            railSideCol
+          );
+        }
+
+        // Chasm Abyss Edges & Left/Right Jump Ramps with Survivor Capacity Badges
+        for (let g = 0; g < gapZones.length; g++) {
+          const gz = gapZones[g];
+          const dz = gz.zStart - camera.z;
+          if (dz < -12 || dz > DRAW_DISTANCE) continue;
+          const fog = fogFactor(dz);
+
+          drawQuad3D(
+            -ROAD_HALF_WIDTH, -6, gz.zStart,
+            ROAD_HALF_WIDTH, -6, gz.zStart,
+            ROAD_HALF_WIDTH, 0, gz.zStart,
+            -ROAD_HALF_WIDTH, 0, gz.zStart,
+            blendFog('#1e1b4b', fog)
+          );
+          drawQuad3D(
+            -ROAD_HALF_WIDTH, 0.02, gz.zStart - 0.55,
+            ROAD_HALF_WIDTH, 0.02, gz.zStart - 0.55,
+            ROAD_HALF_WIDTH, 0.02, gz.zStart,
+            -ROAD_HALF_WIDTH, 0.02, gz.zStart,
+            blendFog('#f43f5e', fog)
+          );
+
+          const rStartZ = gz.zStart - 2.6;
+          const rEndZ = gz.zStart + 0.2;
+          const rH = 1.25;
+          const rampTopCol = blendFog('#38bdf8', fog);
+          const rampSideCol = blendFog('#0284c7', fog);
+          const rampGlowCol = blendFog('#bae6fd', fog);
+
+          drawQuad3D(
+            gz.rampMinX, 0.02, rStartZ,
+            gz.rampMaxX, 0.02, rStartZ,
+            gz.rampMaxX, rH, rEndZ,
+            gz.rampMinX, rH, rEndZ,
+            rampTopCol
+          );
+          const rMidX = (gz.rampMinX + gz.rampMaxX) * 0.5;
+          drawQuad3D(
+            rMidX - 0.35, 0.04, rStartZ + 0.3,
+            rMidX + 0.35, 0.04, rStartZ + 0.3,
+            rMidX + 0.35, rH + 0.02, rEndZ - 0.1,
+            rMidX - 0.35, rH + 0.02, rEndZ - 0.1,
+            rampGlowCol
+          );
+          const innerX = gz.rampSide === -1 ? gz.rampMaxX : gz.rampMinX;
+          drawQuad3D(
+            innerX, 0, rStartZ,
+            innerX, 0, rEndZ,
+            innerX, rH, rEndZ,
+            innerX, 0.02, rStartZ,
+            rampSideCol
+          );
+
+          project3D(rMidX, rH + 1.05, rEndZ, pA);
+          if (pA.visible && fog < 0.85) {
+            const capText = `MAX ${gz.maxSurvivors}`;
+            ctx.font = `900 ${Math.max(11, Math.round(pA.scale * 0.42))}px sans-serif`;
+            const tw = ctx.measureText(capText).width + 14;
+            const th = Math.max(18, Math.round(pA.scale * 0.62));
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
+            ctx.beginPath();
+            ctx.roundRect(pA.sx - tw * 0.5, pA.sy - th * 0.5, tw, th, th * 0.5);
+            ctx.fill();
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.fillStyle = '#fde047';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(capText, pA.sx, pA.sy + 0.5);
+          }
+        }
+
+        // Checkered Finish Line Banner Strip
+        const finDz = finishZ - camera.z;
+        if (finDz > -10 && finDz < DRAW_DISTANCE) {
+          const cols = 12;
+          const cellW = (ROAD_HALF_WIDTH * 2) / cols;
+          for (let r = 0; r < 2; r++) {
+            const fz0 = finishZ - 1.6 + r * 0.8;
+            const fz1 = fz0 + 0.8;
+            for (let c = 0; c < cols; c++) {
+              const fx0 = -ROAD_HALF_WIDTH + c * cellW;
+              const fx1 = fx0 + cellW;
+              const isBlack = (r + c) % 2 === 0;
+              drawQuad3D(fx0, 0.03, fz0, fx1, 0.03, fz0, fx1, 0.03, fz1, fx0, 0.03, fz1, isBlack ? '#1e293b' : '#ffffff');
+            }
+          }
+        }
+
+        // Endgame Staircase Multiplier Steps (1.2x up to 5.0x)
+        for (let i = stairs.length - 1; i >= 0; i--) {
+          const st = stairs[i];
+          const dz = st.z0 - camera.z;
+          if (dz < -15 || dz > DRAW_DISTANCE) continue;
+
+          const fog = fogFactor(dz);
+          const riserY0 = i === 0 ? 0 : stairs[i - 1].y;
+          const topCol = blendFog(st.color, fog);
+          const riserCol = blendFog('#1e293b', fog * 0.75 + 0.15);
+
+          drawQuad3D(
+            -ROAD_HALF_WIDTH, riserY0, st.z0,
+            ROAD_HALF_WIDTH, riserY0, st.z0,
+            ROAD_HALF_WIDTH, st.y, st.z0,
+            -ROAD_HALF_WIDTH, st.y, st.z0,
+            riserCol
+          );
+
+          drawQuad3D(
+            -ROAD_HALF_WIDTH, st.y, st.z0,
+            ROAD_HALF_WIDTH, st.y, st.z0,
+            ROAD_HALF_WIDTH, st.y, st.z1,
+            -ROAD_HALF_WIDTH, st.y, st.z1,
+            topCol
+          );
+
+          project3D(0, (riserY0 + st.y) * 0.5, st.z0 - 0.05, pA);
+          if (pA.visible && fog < 0.85) {
+            const fontSize = Math.max(12, Math.round(pA.scale * 0.68));
+            ctx.font = `900 ${fontSize}px 'Fredoka', sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.35)';
+            ctx.fillText(st.label, pA.sx, pA.sy + 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(st.label, pA.sx, pA.sy);
+          }
+        }
+
+        // Elevated 5.0x Summit Sky Citadel Boss Arena Platform
+        const arenaDz = bossArenaStartZ - camera.z;
+        if (arenaDz < DRAW_DISTANCE && bossArenaEndZ - camera.z > -15) {
+          const ay = bossFightState.arenaY;
+          for (let z = bossArenaStartZ; z < bossArenaEndZ; z += 6) {
+            const z1 = Math.min(bossArenaEndZ, z + 6);
+            const dz = z - camera.z;
+            if (dz < -15 || dz > DRAW_DISTANCE) continue;
+            const fog = fogFactor(dz);
+            const isAlt = (Math.floor((z - bossArenaStartZ) / 6) % 2 === 0);
+            drawQuad3D(
+              -ROAD_HALF_WIDTH, ay, z,
+              ROAD_HALF_WIDTH, ay, z,
+              ROAD_HALF_WIDTH, ay, z1,
+              -ROAD_HALF_WIDTH, ay, z1,
+              blendFog(isAlt ? '#311042' : '#4c1d95', fog)
+            );
+            drawQuad3D(
+              -ROAD_HALF_WIDTH - RAIL_WIDTH, ay + 0.3, z,
+              -ROAD_HALF_WIDTH, ay + 0.3, z,
+              -ROAD_HALF_WIDTH, ay + 0.3, z1,
+              -ROAD_HALF_WIDTH - RAIL_WIDTH, ay + 0.3, z1,
+              blendFog('#facc15', fog)
+            );
+            drawQuad3D(
+              ROAD_HALF_WIDTH, ay + 0.3, z,
+              ROAD_HALF_WIDTH + RAIL_WIDTH, ay + 0.3, z,
+              ROAD_HALF_WIDTH + RAIL_WIDTH, ay + 0.3, z1,
+              ROAD_HALF_WIDTH, ay + 0.3, z1,
+              blendFog('#facc15', fog)
+            );
+          }
+        }
+      }
+
+      function drawGate(g, baseY = 0) {
+        if (g.triggered) return;
+        const dz = g.z - camera.z;
+        if (dz < -4 || dz > DRAW_DISTANCE) return;
+
+        const fog = fogFactor(dz);
+        const gateHeight = 2.45;
+        const postRadius = 0.24;
+
+        project3D(g.minX, baseY, g.z, pA);
+        project3D(g.maxX, baseY, g.z, pB);
+        project3D(g.maxX, baseY + gateHeight, g.z, pC);
+        project3D(g.minX, baseY + gateHeight, g.z, pD);
+        if (!pA.visible || !pB.visible || !pC.visible || !pD.visible) return;
+
+        const isGold = g.isPower || (savedProgress.level % 5 === 0 && !g.isTrap);
+        const alpha = Math.max(0.15, (1 - fog) * 0.72);
+        const panelGrad = ctx.createLinearGradient(0, pD.sy, 0, pA.sy);
+        if (g.isTrap) {
+          panelGrad.addColorStop(0, `rgba(244, 63, 94, ${alpha * 0.65})`);
+          panelGrad.addColorStop(1, `rgba(225, 29, 72, ${alpha})`);
+        } else if (isGold) {
+          panelGrad.addColorStop(0, `rgba(253, 224, 71, ${alpha * 0.7})`);
+          panelGrad.addColorStop(1, `rgba(245, 158, 11, ${alpha})`);
+        } else {
+          panelGrad.addColorStop(0, `rgba(125, 211, 252, ${alpha * 0.55})`);
+          panelGrad.addColorStop(1, `rgba(56, 189, 248, ${alpha})`);
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(pA.sx, pA.sy);
+        ctx.lineTo(pB.sx, pB.sy);
+        ctx.lineTo(pC.sx, pC.sy);
+        ctx.lineTo(pD.sx, pD.sy);
+        ctx.closePath();
+        ctx.fillStyle = panelGrad;
+        ctx.fill();
+
+        ctx.strokeStyle = g.isTrap
+          ? `rgba(254, 205, 211, ${alpha})`
+          : isGold
+            ? `rgba(254, 249, 195, ${alpha})`
+            : `rgba(186, 230, 253, ${alpha})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        const panelW = pB.sx - pA.sx;
+        const panelH = pA.sy - pD.sy;
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.26})`;
+        for (let b = 0; b < 5; b++) {
+          const bx = pA.sx + panelW * (0.18 + ((b * 0.19) % 0.68));
+          const by = pA.sy - panelH * (0.2 + ((b * 0.23) % 0.65));
+          const br = Math.max(2, panelH * (0.04 + (b % 3) * 0.02));
+          ctx.beginPath();
+          ctx.arc(bx, by, br, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        const fontSize = Math.max(14, Math.min(54, Math.round(panelH * (g.label.length > 5 ? 0.32 : 0.44))));
+        ctx.font = `900 ${fontSize}px 'Fredoka', sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const cx = (pA.sx + pB.sx) * 0.5;
+        const cy = (pA.sy + pD.sy) * 0.5;
+
+        ctx.fillStyle = `rgba(15, 23, 42, ${alpha * 0.45})`;
+        ctx.fillText(g.label, cx, cy + 2);
+        ctx.fillStyle = g.isTrap
+          ? `rgba(255, 241, 242, ${Math.min(1, alpha * 1.45)})`
+          : isGold
+            ? `rgba(254, 249, 195, ${Math.min(1, alpha * 1.45)})`
+            : `rgba(240, 249, 255, ${Math.min(1, alpha * 1.45)})`;
+        ctx.fillText(g.label, cx, cy);
+
+        const postCol = blendFog(isGold ? '#b45309' : '#475569', fog);
+        const postCapCol = blendFog(isGold ? '#fde047' : '#94a3b8', fog);
+        const postXList = [g.minX, g.maxX];
+        for (let p = 0; p < 2; p++) {
+          const px = postXList[p];
+          project3D(px, baseY, g.z, pA);
+          project3D(px, baseY + gateHeight + 0.32, g.z, pB);
+          if (!pA.visible || !pB.visible) continue;
+          const pw = Math.max(4, pA.scale * postRadius * 2);
+          ctx.fillStyle = postCol;
+          ctx.fillRect(pA.sx - pw * 0.5, pB.sy, pw, pA.sy - pB.sy);
+          ctx.beginPath();
+          ctx.ellipse(pB.sx, pB.sy, pw * 0.5, pw * 0.22, 0, 0, Math.PI * 2);
+          ctx.fillStyle = postCapCol;
+          ctx.fill();
+        }
+      }
+
+      function drawObstacle(obs) {
+        const dz = obs.z - camera.z;
+        if (dz < -4 || dz > DRAW_DISTANCE) return;
+        const fog = fogFactor(dz);
+
+        if (obs.kind === 'SAWBLADE') {
+          project3D(obs.x, 0.35, obs.z, pA);
+          if (!pA.visible) return;
+          const rx = pA.scale * obs.radius;
+          const ry = rx * 0.42;
+
+          ctx.save();
+          ctx.translate(pA.sx, pA.sy);
+          ctx.scale(1, 0.42);
+          ctx.rotate(obs.spinAngle);
+
+          const teeth = 12;
+          ctx.beginPath();
+          for (let t = 0; t < teeth * 2; t++) {
+            const ang = (t * Math.PI) / teeth;
+            const r = t % 2 === 0 ? rx : rx * 0.72;
+            const tx = Math.cos(ang) * r;
+            const ty = Math.sin(ang) * r;
+            if (t === 0) ctx.moveTo(tx, ty);
+            else ctx.lineTo(tx, ty);
+          }
+          ctx.closePath();
+          ctx.fillStyle = blendFog('#e2e8f0', fog);
+          ctx.fill();
+          ctx.strokeStyle = blendFog('#ef4444', fog);
+          ctx.lineWidth = 3;
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(0, 0, rx * 0.35, 0, Math.PI * 2);
+          ctx.fillStyle = blendFog('#dc2626', fog);
+          ctx.fill();
+          ctx.restore();
+
+          ctx.fillStyle = blendFog('#334155', fog);
+          ctx.fillRect(pA.sx - 4, pA.sy, 8, ry * 0.7);
+          return;
+        }
+
+        const hw = obs.w * 0.5;
+        const hd = obs.d * 0.5;
+        const h = obs.h;
+        const isMoving = obs.kind === 'MOVING_WALL';
+
+        const frontCol = blendFog(isMoving ? '#dc2626' : '#64748b', fog);
+        const topCol   = blendFog(isMoving ? '#f87171' : '#94a3b8', fog);
+        const sideCol  = blendFog(isMoving ? '#991b1b' : '#475569', fog);
+        const trimCol  = blendFog(isMoving ? '#fecaca' : '#cbd5e1', fog);
+
+        drawQuad3D(
+          obs.x - hw, h, obs.z - hd,
+          obs.x + hw, h, obs.z - hd,
+          obs.x + hw, h, obs.z + hd,
+          obs.x - hw, h, obs.z + hd,
+          topCol, trimCol
+        );
+
+        drawQuad3D(
+          obs.x - hw, 0, obs.z - hd,
+          obs.x + hw, 0, obs.z - hd,
+          obs.x + hw, h, obs.z - hd,
+          obs.x - hw, h, obs.z - hd,
+          frontCol
+        );
+
+        if (obs.x > 0) {
+          drawQuad3D(
+            obs.x - hw, 0, obs.z + hd,
+            obs.x - hw, 0, obs.z - hd,
+            obs.x - hw, h, obs.z - hd,
+            obs.x - hw, h, obs.z + hd,
+            sideCol
+          );
+        } else {
+          drawQuad3D(
+            obs.x + hw, 0, obs.z - hd,
+            obs.x + hw, 0, obs.z + hd,
+            obs.x + hw, h, obs.z + hd,
+            obs.x + hw, h, obs.z - hd,
+            sideCol
+          );
+        }
+      }
+
+      function drawRunnerUnit(u) {
+        project3D(u.x, u.y, u.z, pA);
+        if (!pA.visible) return;
+
+        const leaderScaleBoost = u.isLeader ? 1.28 : 1.0;
+        const s = pA.scale * u.scalePop * leaderScaleBoost;
+        const drawH = Math.max(14, s * 1.38);
+        const drawW = drawH * (SPRITE_W / SPRITE_H);
+
+        const strideBob = u.fallen ? 0 : Math.sin(u.phase) * 0.05;
+        const w = drawW * (1 + strideBob * 0.5);
+        const h = drawH * (1 - strideBob * 0.5);
+        const tilt = u.fallen ? 0 : Math.cos(u.phase) * 0.07;
+
+        const sprite = u.isLeader ? kingSpriteCanvas : followerSpriteCanvas;
+        const anchorY = pA.sy + h * 0.11;
+
+        if (Math.abs(tilt) > 0.015 && s > 18) {
+          ctx.save();
+          ctx.translate(pA.sx, anchorY);
+          ctx.rotate(tilt);
+          ctx.drawImage(sprite, -w * 0.5, -h, w, h);
+          ctx.restore();
+        } else {
+          ctx.drawImage(sprite, pA.sx - w * 0.5, anchorY - h, w, h);
+        }
+      }
+
+      function drawBossMan() {
+        if (!bossFightState.active || bossFightState.defeated) return;
+        const bx = bossFightState.bossX;
+        const by = bossFightState.arenaY;
+        const bz = bossFightState.bossZ;
+
+        project3D(bx, by, bz, pA);
+        if (!pA.visible) return;
+
+        const s = pA.scale;
+        const bodyW = Math.max(38, s * 2.1);
+        const bodyH = Math.max(64, s * 3.5);
+        const flash = bossFightState.hitFlash > 0.2;
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.45)';
+        ctx.beginPath();
+        ctx.ellipse(pA.sx, pA.sy + 4, bodyW * 0.85, bodyW * 0.3, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        const bGrad = ctx.createLinearGradient(pA.sx - bodyW * 0.5, pA.sy - bodyH, pA.sx + bodyW * 0.5, pA.sy);
+        bGrad.addColorStop(0, flash ? '#ffffff' : '#fb7185');
+        bGrad.addColorStop(0.5, flash ? '#fef08a' : '#dc2626');
+        bGrad.addColorStop(1, '#7f1d1d');
+
+        ctx.fillStyle = bGrad;
+        ctx.beginPath();
+        ctx.roundRect(pA.sx - bodyW * 0.5, pA.sy - bodyH, bodyW, bodyH, bodyW * 0.42);
+        ctx.fill();
+
+        ctx.fillStyle = '#fde047';
+        ctx.beginPath();
+        ctx.moveTo(pA.sx - bodyW * 0.35, pA.sy - bodyH * 0.88);
+        ctx.lineTo(pA.sx - bodyW * 0.58, pA.sy - bodyH * 1.15);
+        ctx.lineTo(pA.sx - bodyW * 0.15, pA.sy - bodyH * 0.96);
+        ctx.moveTo(pA.sx + bodyW * 0.35, pA.sy - bodyH * 0.88);
+        ctx.lineTo(pA.sx + bodyW * 0.58, pA.sy - bodyH * 1.15);
+        ctx.lineTo(pA.sx + bodyW * 0.15, pA.sy - bodyH * 0.96);
+        ctx.fill();
+
+        ctx.fillStyle = '#fef08a';
+        ctx.beginPath();
+        ctx.arc(pA.sx - bodyW * 0.18, pA.sy - bodyH * 0.72, bodyW * 0.09, 0, Math.PI * 2);
+        ctx.arc(pA.sx + bodyW * 0.18, pA.sy - bodyH * 0.72, bodyW * 0.09, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const renderQueue = [];
+
+      function render() {
+        ctx.save();
+        if (camera.shakeTimer > 0) {
+          const mag = camera.shakeIntensity * 18 * (camera.shakeTimer / 0.25);
+          ctx.translate((Math.random() - 0.5) * mag, (Math.random() - 0.5) * mag);
+        }
+
+        drawSky();
+        drawCliffs();
+        drawRoadAndStairs();
+
+        renderQueue.length = 0;
+
+        for (let i = 0; i < gates.length; i++) {
+          const g = gates[i];
+          if (!g.triggered && g.z > camera.z && g.z < camera.z + DRAW_DISTANCE) {
+            renderQueue.push({ type: 'GATE', z: g.z, ref: g, baseY: 0 });
+          }
+        }
+        for (let i = 0; i < bossGates.length; i++) {
+          const bg = bossGates[i];
+          if (!bg.triggered && bg.z > camera.z && bg.z < camera.z + DRAW_DISTANCE) {
+            renderQueue.push({ type: 'GATE', z: bg.z, ref: bg, baseY: bossFightState.arenaY });
+          }
+        }
+        for (let i = 0; i < obstacles.length; i++) {
+          const obs = obstacles[i];
+          if (obs.z > camera.z && obs.z < camera.z + DRAW_DISTANCE) {
+            renderQueue.push({ type: 'OBSTACLE', z: obs.z, ref: obs });
+          }
+        }
+        if (bossFightState.active && !bossFightState.defeated) {
+          renderQueue.push({ type: 'BOSS', z: bossFightState.bossZ, ref: null });
+        }
+        for (let i = 0; i < MAX_VISUAL_CROWD; i++) {
+          const u = crowdPool[i];
+          if (u.active && u.z > camera.z + 0.5 && u.z < camera.z + DRAW_DISTANCE) {
+            renderQueue.push({ type: 'UNIT', z: u.z, ref: u });
+          }
+        }
+
+        renderQueue.sort((a, b) => b.z - a.z);
+
+        for (let i = 0; i < renderQueue.length; i++) {
+          const item = renderQueue[i];
+          if (item.type === 'GATE') drawGate(item.ref, item.baseY);
+          else if (item.type === 'OBSTACLE') drawObstacle(item.ref);
+          else if (item.type === 'BOSS') drawBossMan();
+          else drawRunnerUnit(item.ref);
+        }
+
+        // Particles
+        for (let i = 0; i < MAX_PARTICLES; i++) {
+          const p = particlePool[i];
+          if (!p.active) continue;
+          project3D(p.x, p.y, p.z, pA);
+          if (!pA.visible) continue;
+          const alpha = 1 - p.life / p.maxLife;
+          ctx.globalAlpha = Math.max(0, alpha);
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(pA.sx, pA.sy, Math.max(2, pA.scale * p.size), 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+
+        // Floating Crowd Count Pill above King
+        if (activeCount > 0 && (gameState.phase === 'RUNNING' || gameState.phase === 'MENU' || gameState.phase === 'BOSS_GAUNTLET')) {
+          const badgeBaseY = gameState.phase === 'BOSS_GAUNTLET' ? bossFightState.arenaY : 0;
+          project3D(gameState.playerX, badgeBaseY + 1.88, gameState.playerZ + 0.45, pA);
+          if (pA.visible) {
+            const label = formatCompactNumber(activeCount);
+            ctx.font = '900 13px "Nunito", sans-serif';
+            const textW = ctx.measureText(label).width;
+            const pillW = Math.max(32, textW + 16);
+            const pillH = 22;
+            const px = pA.sx - pillW * 0.5;
+            const py = pA.sy - pillH * 0.5;
+
+            ctx.fillStyle = '#0ea5e9';
+            ctx.beginPath();
+            ctx.roundRect(px, py, pillW, pillH, pillH * 0.5);
+            ctx.fill();
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.lineWidth = 1.8;
+            ctx.stroke();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label, pA.sx, pA.sy + 0.5);
+          }
+        }
+
+        // Popups
+        for (let i = 0; i < MAX_POPUPS; i++) {
+          const pop = popupPool[i];
+          if (!pop.active) continue;
+          project3D(pop.x, pop.y, pop.z, pA);
+          if (!pA.visible) continue;
+          const alpha = Math.min(1, (1 - pop.life / pop.maxLife) * 1.4);
+          ctx.globalAlpha = Math.max(0, alpha);
+          ctx.font = '900 22px "Fredoka", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.55)';
+          ctx.fillText(pop.text, pA.sx, pA.sy + 2);
+          ctx.fillStyle = pop.color;
+          ctx.fillText(pop.text, pA.sx, pA.sy);
+        }
+        ctx.globalAlpha = 1;
+
+        ctx.restore();
+      }
+
+      // ------------------------------------------------------------------------
+      // 13. MAIN REQUESTANIMATIONFRAME LOOP WITH CLAMPED DELTA TIME
+      // ------------------------------------------------------------------------
+      let lastTimestamp = 0;
+
+      function gameLoop(timestamp) {
+        if (!lastTimestamp) lastTimestamp = timestamp;
+        const dt = Math.min(0.05, (timestamp - lastTimestamp) / 1000);
+        lastTimestamp = timestamp;
+
+        update(dt);
+        render();
+
+        requestAnimationFrame(gameLoop);
+      }
+
+      enterMainMenu();
+      requestAnimationFrame(gameLoop);
+    })();
+  </script>
+</body>
+</html>
